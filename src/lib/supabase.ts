@@ -96,6 +96,70 @@ export const db = {
     return { data, error };
   },
 
+  // Mission Steps
+  async getMissionSteps(missionId: string) {
+    const { data, error } = await supabase
+      .from('mission_steps')
+      .select('*')
+      .eq('mission_id', missionId)
+      .order('order_index');
+    return { data, error };
+  },
+
+  async saveMissionSteps(missionId: string, steps: any[]) {
+    // 既存のステップを削除
+    await supabase
+      .from('mission_steps')
+      .delete()
+      .eq('mission_id', missionId);
+
+    // 新しいステップを挿入
+    if (steps.length > 0) {
+      const stepsWithMissionId = steps.map((step, index) => ({
+        mission_id: missionId,
+        order_index: index,
+        title: step.title,
+        instruction: step.instruction,
+        hint: step.hint || null,
+        validation_type: step.validationType,
+        validation_params: step.validationParams || {},
+      }));
+
+      const { data, error } = await supabase
+        .from('mission_steps')
+        .insert(stepsWithMissionId)
+        .select();
+      return { data, error };
+    }
+    return { data: [], error: null };
+  },
+
+  async getMissionWithSteps(missionId: string) {
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('*')
+      .eq('id', missionId)
+      .single();
+    
+    if (missionError) return { data: null, error: missionError };
+
+    const { data: steps, error: stepsError } = await supabase
+      .from('mission_steps')
+      .select('*')
+      .eq('mission_id', missionId)
+      .order('order_index');
+
+    if (stepsError) return { data: null, error: stepsError };
+
+    return {
+      data: {
+        ...mission,
+        steps: steps || [],
+      },
+      error: null,
+    };
+  },
+
   async getUserMissions(userId: string) {
     const { data, error } = await supabase
       .from('user_missions')

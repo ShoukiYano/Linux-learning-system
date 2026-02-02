@@ -2,12 +2,39 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Terminal } from '../components/Terminal';
 import { MISSIONS, INITIAL_FILE_SYSTEM } from '../constants';
-import { FileSystemNode, CommandHistory } from '../types';
-import { ChevronLeft, Play, CheckCircle, HelpCircle, RotateCcw, FolderTree, BookOpen, Zap, Folder, File } from 'lucide-react';
+import { FileSystemNode, CommandHistory, MissionStep, ValidationType, ValidationParams } from '../types';
+import { ChevronLeft, Play, CheckCircle, HelpCircle, RotateCcw, FolderTree, BookOpen, Zap, Folder, File, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { db } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
+import { executeCommand, resolvePath } from '../utils/terminalLogic';
 
+// 検証関数を生成するヘルパー
+const createValidationFunction = (
+  validationType: ValidationType,
+  validationParams: ValidationParams
+): (history: CommandHistory[]) => boolean => {
+  switch (validationType) {
+    case 'command_match':
+      return (history) => history.some(h => h.command.trim() === validationParams.command);
+    case 'command_contains':
+      return (history) => history.some(h => h.command.includes(validationParams.pattern || ''));
+    case 'output_contains':
+      return (history) => history.some(h => 
+        typeof h.output === 'string' && h.output.includes(validationParams.pattern || '')
+      );
+    case 'file_exists':
+      // ファイル存在確認は現在のファイルシステム状態を見る必要があるため、
+      // ここでは簡易的にlsコマンドの出力をチェック
+      return (history) => history.some(h => 
+        h.command.includes('ls') && 
+        typeof h.output === 'string' && 
+        h.output.includes(validationParams.filePath || '')
+      );
+    default:
+      return () => false;
+  }
+};
 
 const renderFileTree = (node: FileSystemNode, path: string, depth: number = 0): React.ReactNode[] => {
   const result: React.ReactNode[] = [];
@@ -32,21 +59,86 @@ const renderFileTree = (node: FileSystemNode, path: string, depth: number = 0): 
   return result;
 };
 
+interface MissionData {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: string;
+  xp: number;
+  steps: MissionStep[];
+}
 
 export const MissionRunner = () => {
   const { id } = useParams();
   const { user } = useAuth();
-  const mission = MISSIONS.find(m => m.id === id) || MISSIONS[0];
   
+  const [mission, setMission] = useState<MissionData | null>(null);
+  const [loadingMission, setLoadingMission] = useState(true);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [fs, setFs] = useState<FileSystemNode>(JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM)));
+  const [cwd, setCwd] = useState('/home/student');
   const [commandLog, setCommandLog] = useState<CommandHistory[]>([]);
   const [showHint, setShowHint] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [activeTab, setActiveTab] = useState<'guide' | 'files'>('guide');
   const [startTime, setStartTime] = useState<number>(Date.now());
 
-  const currentStep = mission.steps[currentStepIndex];
+  // ミッションデータの取得
+  useEffect(() => {
+    const loadMission = async () => {
+      setLoadingMission(true);
+      
+      // まずデータベースからミッションを取得
+      const { data: dbMission } = await db.getMissionWithSteps(id || '');
+      
+      if (dbMission && dbMission.steps && dbMission.steps.length > 0) {
+        // データベースからのミッション（ステップあり）
+        const formattedSteps: MissionStep[] = dbMission.steps.map((step: any) => ({
+          id: step.id,
+          title: step.title,
+          instruction: step.instruction,
+          hint: step.hint,
+          validationType: step.validation_type as ValidationType,
+          validationParams: step.validation_params as ValidationParams,
+          validation: createValidationFunction(
+            step.validation_type as ValidationType,
+            step.validation_params as ValidationParams
+          ),
+        }));
+
+        setMission({
+          id: dbMission.id,
+          title: dbMission.title,
+          description: dbMission.description,
+          category: dbMission.category,
+          difficulty: dbMission.difficulty,
+          xp: dbMission.xp,
+          steps: formattedSteps,
+        });
+      } else {
+        // フォールバック: constants.tsのハードコードミッション
+        const constantMission = MISSIONS.find(m => m.id === id);
+        if (constantMission) {
+          setMission({
+            id: constantMission.id,
+            title: constantMission.title,
+            description: constantMission.description,
+            category: constantMission.category,
+            difficulty: constantMission.difficulty,
+            xp: constantMission.xp,
+            steps: constantMission.steps,
+          });
+        }
+      }
+      
+      setLoadingMission(false);
+    };
+
+    loadMission();
+  }, [id]);
+
+  const currentStep = mission?.steps[currentStepIndex];
 
   const handleCommand = (cmd: string, output: string) => {
     const newCommand: CommandHistory = {
@@ -54,13 +146,29 @@ export const MissionRunner = () => {
       output,
       timestamp: Date.now(),
       status: output.includes('error') || output.includes('cannot') ? 'error' : 'success',
-      cwd: '/'
+      cwd: cwd 
     };
     setCommandLog(prev => [...prev, newCommand]);
   };
 
   const checkProgress = () => {
-    if (currentStep && currentStep.validation(commandLog)) {
+    if (!mission || !currentStep) return;
+
+    // 検証関数を取得または生成
+    let isValid = false;
+    if (currentStep.validation) {
+      // 関数ベースの検証（constants.ts由来）
+      isValid = currentStep.validation(commandLog);
+    } else if (currentStep.validationType && currentStep.validationParams) {
+      // パラメータベースの検証（データベース由来）
+      const validationFn = createValidationFunction(
+        currentStep.validationType,
+        currentStep.validationParams
+      );
+      isValid = validationFn(commandLog);
+    }
+
+    if (isValid) {
       if (currentStepIndex < mission.steps.length - 1) {
         setCurrentStepIndex(prev => prev + 1);
         setShowHint(false);
@@ -73,6 +181,7 @@ export const MissionRunner = () => {
   };
 
   const completeMission = async () => {
+    if (!mission) return;
     setIsCompleted(true);
     if (user?.id) {
       const elapsedTime = Date.now() - startTime;
@@ -90,12 +199,71 @@ export const MissionRunner = () => {
     setFs(JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM)));
     setCommandLog([]);
     setShowHint(false);
+    setCwd('/home/student');
     setStartTime(Date.now());
   };
 
+  // カレントディレクトリのファイル一覧を取得
+  const getCurrentFiles = () => {
+    const currentDir = resolvePath(fs, cwd, '.');
+    if (!currentDir || !currentDir.children) return [];
+    
+    return Object.entries(currentDir.children).map(([name, node]) => ({
+      name,
+      type: node.type,
+      content: node.content,
+      permissions: node.permissions,
+    }));
+  };
+
+  const currentFiles = getCurrentFiles();
+
+  // ローディング中
+  if (loadingMission) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-100">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 size={48} className="animate-spin text-primary-500" />
+          <p className="text-slate-400">ミッションを読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ミッションが見つからない
+  if (!mission) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-100">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">ミッションが見つかりません</h1>
+          <Link to="/missions" className="text-primary-400 hover:underline">
+            ミッション一覧に戻る
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ステップがない
+  if (mission.steps.length === 0) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-100">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">このミッションにはまだステップがありません</h1>
+          <p className="text-slate-400 mb-4">{mission.title}</p>
+          <Link to="/missions" className="text-primary-400 hover:underline">
+            ミッション一覧に戻る
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (isCompleted) {
     const elapsedSeconds = Math.round((Date.now() - startTime) / 1000);
-    const successRate = Math.round((commandLog.filter(c => c.status === 'success').length / commandLog.length) * 100);
+    const successRate = commandLog.length > 0 
+      ? Math.round((commandLog.filter(c => c.status === 'success').length / commandLog.length) * 100)
+      : 100;
     
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
@@ -248,34 +416,71 @@ export const MissionRunner = () => {
           <div className="flex-1 flex gap-0 min-h-0">
             {/* Terminal */}
             <div className="flex-1 border-r border-slate-700 overflow-hidden">
-              <Terminal onCommand={handleCommand} fileSystem={fs} />
+              <Terminal 
+                fs={fs}
+                setFs={setFs}
+                onCommand={handleCommand} 
+                onCwdChange={setCwd}
+              />
             </div>
 
             {/* GUI File Manager */}
             <div className="w-1/2 border-l border-slate-700 bg-slate-900 flex flex-col overflow-hidden">
-              <div className="h-8 border-b border-slate-700 flex items-center px-4 bg-slate-800">
-                <span className="text-xs font-bold text-slate-400">📂 File Manager (GUI) - リアルタイム同期</span>
+              <div className="h-8 border-b border-slate-700 flex items-center px-4 bg-slate-800 gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="ml-auto text-xs text-slate-500">File Manager</span>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 font-mono text-xs">
-                <div className="text-slate-500 mb-4">📍 /home/student</div>
-                <div className="space-y-1">
-                  {fs && Object.entries(fs.children || {}).map(([name, child]: any) => (
-                    <div key={name} className="flex items-center gap-2 p-2 rounded bg-slate-800/50 hover:bg-slate-800 transition-colors">
-                      {child.type === 'directory' ? (
-                        <>
-                          <span className="text-blue-400">📁</span>
-                          <span className="text-blue-300 font-bold">{name}/</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>📄</span>
-                          <span className="text-slate-200">{name}</span>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                  {!fs?.children || Object.keys(fs.children).length === 0 && (
-                    <div className="text-slate-600 text-center py-8">📭 ファイルなし</div>
+              <div className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-[#0f172a]">
+                <div className="flex items-center gap-2 text-slate-500 mb-4">
+                  <span className="text-red-400">📍</span>
+                  <span>{cwd}</span>
+                </div>
+                <div className="space-y-2">
+                  {currentFiles.length > 0 ? (
+                    currentFiles.map((file) => (
+                      <div 
+                        key={file.name} 
+                        className={`p-3 rounded-lg border transition-all ${
+                          file.type === 'directory'
+                            ? 'bg-blue-500/10 border-blue-500/30'
+                            : 'bg-slate-700/30 border-slate-600/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {file.type === 'directory' ? (
+                              <Folder size={16} className="text-yellow-400" />
+                            ) : (
+                              <File size={16} className="text-slate-400" />
+                            )}
+                            <span className={file.type === 'directory' ? 'text-blue-300 font-bold' : 'text-slate-200'}>
+                              {file.name}
+                            </span>
+                          </div>
+                          {file.type === 'file' && (
+                            <span className="text-xs text-slate-500">{file.content?.length || 0} bytes</span>
+                          )}
+                        </div>
+                        {file.type === 'file' && (
+                          <div className="mt-2 space-y-1">
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                              Last modified: just now
+                            </div>
+                            {file.content && (
+                              <div className="bg-slate-800/50 p-2 rounded text-xs truncate">
+                                <span className="text-slate-500">内容: </span>
+                                <span className="text-green-400">"{file.content}"</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-slate-500 text-center py-8">📭 ディレクトリは空です</div>
                   )}
                 </div>
               </div>
@@ -286,11 +491,10 @@ export const MissionRunner = () => {
           <div className="h-10 border-t border-slate-700 bg-slate-800/50 flex items-center px-4 text-xs text-slate-400 gap-6">
             <span>✓ コマンド実行: {commandLog.filter(c => c.status === 'success').length}</span>
             <span>✗ エラー: {commandLog.filter(c => c.status === 'error').length}</span>
-            <span>📊 ファイル数: {fs?.children ? Object.keys(fs.children).length : 0}</span>
+            <span>📂 現在のパス: {cwd}</span>
           </div>
         </div>
       </div>
     </div>
   );
 };
-

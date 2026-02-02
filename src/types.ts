@@ -21,12 +21,25 @@ export interface Mission {
   steps: MissionStep[];
 }
 
+// 検証タイプの定義
+export type ValidationType = 'command_match' | 'command_contains' | 'output_contains' | 'file_exists';
+
+export interface ValidationParams {
+  command?: string;      // command_match用: 完全一致するコマンド
+  pattern?: string;      // command_contains, output_contains用: 含まれるべきパターン
+  filePath?: string;     // file_exists用: 存在確認するファイルパス
+}
+
 export interface MissionStep {
   id: string;
   title: string;
   instruction: string;
   hint?: string;
-  validation: (history: CommandHistory[]) => boolean;
+  // 従来の関数ベース検証（constants.ts用）
+  validation?: (history: CommandHistory[]) => boolean;
+  // データベース用の検証設定
+  validationType?: ValidationType;
+  validationParams?: ValidationParams;
   initialFileSystem?: FileSystemNode;
 }
 

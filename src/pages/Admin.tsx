@@ -3,7 +3,17 @@ import { Layout } from '../components/Layout';
 import { useAuth } from '../lib/AuthContext';
 import { db } from '../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
+import { ValidationType, ValidationParams } from '../types';
+
+interface MissionStepFormData {
+  id?: string;
+  title: string;
+  instruction: string;
+  hint: string;
+  validationType: ValidationType;
+  validationParams: ValidationParams;
+}
 
 interface MissionFormData {
   id?: string;
@@ -13,23 +23,36 @@ interface MissionFormData {
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Expert';
   xp: number;
   isLocked: boolean;
+  steps: MissionStepFormData[];
 }
+
+const emptyStep: MissionStepFormData = {
+  title: '',
+  instruction: '',
+  hint: '',
+  validationType: 'command_match',
+  validationParams: { command: '' },
+};
+
+const initialFormData: MissionFormData = {
+  title: '',
+  description: '',
+  category: 'File Ops',
+  difficulty: 'Easy',
+  xp: 100,
+  isLocked: false,
+  steps: [],
+};
 
 export const Admin = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [missions, setMissions] = useState<any[]>([]);
-  const [formData, setFormData] = useState<MissionFormData>({
-    title: '',
-    description: '',
-    category: 'File Ops',
-    difficulty: 'Easy',
-    xp: 100,
-    isLocked: false,
-  });
+  const [formData, setFormData] = useState<MissionFormData>(initialFormData);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [activeStepIndex, setActiveStepIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -49,29 +72,35 @@ export const Admin = () => {
     setLoading(true);
 
     try {
+      let missionId = editingId;
+
       if (editingId) {
         // Update mission
+        const { title, description, category, difficulty, xp, isLocked } = formData;
         await db.supabase
           .from('missions')
-          .update(formData)
+          .update({ title, description, category, difficulty, xp, is_locked: isLocked })
           .eq('id', editingId);
       } else {
         // Create mission
-        await db.supabase
+        const { title, description, category, difficulty, xp, isLocked } = formData;
+        const { data } = await db.supabase
           .from('missions')
-          .insert([formData]);
+          .insert([{ title, description, category, difficulty, xp, is_locked: isLocked }])
+          .select()
+          .single();
+        if (data) missionId = data.id;
       }
-      
-      setFormData({
-        title: '',
-        description: '',
-        category: 'File Ops',
-        difficulty: 'Easy',
-        xp: 100,
-        isLocked: false,
-      });
+
+      // Save steps
+      if (missionId && formData.steps.length > 0) {
+        await db.saveMissionSteps(missionId, formData.steps);
+      }
+
+      setFormData(initialFormData);
       setEditingId(null);
       setShowForm(false);
+      setActiveStepIndex(null);
       await fetchMissions();
     } catch (error) {
       console.error('Error saving mission:', error);
@@ -80,8 +109,28 @@ export const Admin = () => {
     }
   };
 
-  const handleEdit = (mission: any) => {
-    setFormData(mission);
+  const handleEdit = async (mission: any) => {
+    // Load mission with steps
+    const { data: steps } = await db.getMissionSteps(mission.id);
+    const formattedSteps: MissionStepFormData[] = (steps || []).map((step: any) => ({
+      id: step.id,
+      title: step.title,
+      instruction: step.instruction,
+      hint: step.hint || '',
+      validationType: step.validation_type as ValidationType,
+      validationParams: step.validation_params || {},
+    }));
+
+    setFormData({
+      id: mission.id,
+      title: mission.title,
+      description: mission.description,
+      category: mission.category,
+      difficulty: mission.difficulty,
+      xp: mission.xp,
+      isLocked: mission.is_locked || false,
+      steps: formattedSteps,
+    });
     setEditingId(mission.id);
     setShowForm(true);
   };
@@ -90,6 +139,96 @@ export const Admin = () => {
     if (confirm('このミッションを削除してもよろしいですか？')) {
       await db.supabase.from('missions').delete().eq('id', id);
       await fetchMissions();
+    }
+  };
+
+  // Step management functions
+  const addStep = () => {
+    setFormData({
+      ...formData,
+      steps: [...formData.steps, { ...emptyStep }],
+    });
+    setActiveStepIndex(formData.steps.length);
+  };
+
+  const removeStep = (index: number) => {
+    const newSteps = formData.steps.filter((_, i) => i !== index);
+    setFormData({ ...formData, steps: newSteps });
+    setActiveStepIndex(null);
+  };
+
+  const updateStep = (index: number, field: keyof MissionStepFormData, value: any) => {
+    const newSteps = [...formData.steps];
+    newSteps[index] = { ...newSteps[index], [field]: value };
+    setFormData({ ...formData, steps: newSteps });
+  };
+
+  const moveStep = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= formData.steps.length) return;
+
+    const newSteps = [...formData.steps];
+    [newSteps[index], newSteps[newIndex]] = [newSteps[newIndex], newSteps[index]];
+    setFormData({ ...formData, steps: newSteps });
+    setActiveStepIndex(newIndex);
+  };
+
+  const getValidationParamsUI = (step: MissionStepFormData, index: number) => {
+    switch (step.validationType) {
+      case 'command_match':
+        return (
+          <div>
+            <label className="block text-xs font-bold mb-1 text-slate-400">完全一致コマンド</label>
+            <input
+              type="text"
+              value={step.validationParams.command || ''}
+              onChange={(e) => updateStep(index, 'validationParams', { command: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+              placeholder="例: pwd"
+            />
+          </div>
+        );
+      case 'command_contains':
+        return (
+          <div>
+            <label className="block text-xs font-bold mb-1 text-slate-400">コマンドに含む文字列</label>
+            <input
+              type="text"
+              value={step.validationParams.pattern || ''}
+              onChange={(e) => updateStep(index, 'validationParams', { pattern: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+              placeholder="例: ls"
+            />
+          </div>
+        );
+      case 'output_contains':
+        return (
+          <div>
+            <label className="block text-xs font-bold mb-1 text-slate-400">出力に含む文字列</label>
+            <input
+              type="text"
+              value={step.validationParams.pattern || ''}
+              onChange={(e) => updateStep(index, 'validationParams', { pattern: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+              placeholder="例: /home/student"
+            />
+          </div>
+        );
+      case 'file_exists':
+        return (
+          <div>
+            <label className="block text-xs font-bold mb-1 text-slate-400">存在確認するファイルパス</label>
+            <input
+              type="text"
+              value={step.validationParams.filePath || ''}
+              onChange={(e) => updateStep(index, 'validationParams', { filePath: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+              placeholder="例: /home/student/test.txt"
+            />
+          </div>
+        );
+      default:
+        return null;
     }
   };
 
@@ -135,7 +274,11 @@ export const Admin = () => {
           <button
             onClick={() => {
               setShowForm(!showForm);
-              if (showForm) setEditingId(null);
+              if (showForm) {
+                setEditingId(null);
+                setFormData(initialFormData);
+                setActiveStepIndex(null);
+              }
             }}
             className="flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg font-bold transition-colors"
           >
@@ -152,14 +295,8 @@ export const Admin = () => {
                 onClick={() => {
                   setShowForm(false);
                   setEditingId(null);
-                  setFormData({
-                    title: '',
-                    description: '',
-                    category: 'File Ops',
-                    difficulty: 'Easy',
-                    xp: 100,
-                    isLocked: false,
-                  });
+                  setFormData(initialFormData);
+                  setActiveStepIndex(null);
                 }}
                 className="text-slate-400 hover:text-white"
               >
@@ -168,85 +305,222 @@ export const Admin = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-bold mb-2">タイトル</label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+              {/* Basic Info Section */}
+              <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-700">
+                <h3 className="text-lg font-bold mb-4 text-primary-400">📋 基本情報</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold mb-2">タイトル</label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">カテゴリ</label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                    >
+                      <option>File Ops</option>
+                      <option>Permissions</option>
+                      <option>Network</option>
+                      <option>Text Processing</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">難易度</label>
+                    <select
+                      value={formData.difficulty}
+                      onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                    >
+                      <option>Easy</option>
+                      <option>Medium</option>
+                      <option>Hard</option>
+                      <option>Expert</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">XP 報酬</label>
+                    <input
+                      type="number"
+                      value={formData.xp}
+                      onChange={(e) => setFormData({ ...formData, xp: parseInt(e.target.value) })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                      min="10"
+                      step="10"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-bold mb-2">説明</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500 h-24"
                     required
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-bold mb-2">カテゴリ</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
-                  >
-                    <option>File Ops</option>
-                    <option>Permissions</option>
-                    <option>Network</option>
-                    <option>Text Processing</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold mb-2">難易度</label>
-                  <select
-                    value={formData.difficulty}
-                    onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
-                  >
-                    <option>Easy</option>
-                    <option>Medium</option>
-                    <option>Hard</option>
-                    <option>Expert</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-bold mb-2">XP 報酬</label>
+                <div className="flex items-center gap-2 mt-4">
                   <input
-                    type="number"
-                    value={formData.xp}
-                    onChange={(e) => setFormData({ ...formData, xp: parseInt(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
-                    min="10"
-                    step="10"
+                    type="checkbox"
+                    id="isLocked"
+                    checked={formData.isLocked}
+                    onChange={(e) => setFormData({ ...formData, isLocked: e.target.checked })}
+                    className="rounded"
                   />
+                  <label htmlFor="isLocked" className="text-sm font-bold">ロック状態（ユーザーが実行できません）</label>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-bold mb-2">説明</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500 h-24"
-                  required
-                />
+              {/* Steps Section */}
+              <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-700">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold text-primary-400">📝 ミッションステップ</h3>
+                  <button
+                    type="button"
+                    onClick={addStep}
+                    className="flex items-center gap-1 bg-primary-600 hover:bg-primary-500 text-white px-3 py-1 rounded text-sm font-bold transition-colors"
+                  >
+                    <Plus size={16} /> ステップ追加
+                  </button>
+                </div>
+
+                {formData.steps.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500">
+                    <p>ステップがありません。「ステップ追加」ボタンをクリックしてください。</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {formData.steps.map((step, index) => (
+                      <div
+                        key={index}
+                        className={`border rounded-lg overflow-hidden transition-all ${
+                          activeStepIndex === index
+                            ? 'border-primary-500 bg-slate-800'
+                            : 'border-slate-700 bg-slate-800/50'
+                        }`}
+                      >
+                        {/* Step Header */}
+                        <div
+                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-700/50"
+                          onClick={() => setActiveStepIndex(activeStepIndex === index ? null : index)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <GripVertical size={16} className="text-slate-500" />
+                            <span className="bg-primary-500/20 text-primary-400 text-xs font-bold px-2 py-1 rounded">
+                              Step {index + 1}
+                            </span>
+                            <span className="font-medium text-sm">
+                              {step.title || '(タイトル未設定)'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); moveStep(index, 'up'); }}
+                              disabled={index === 0}
+                              className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                            >
+                              <ChevronUp size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); moveStep(index, 'down'); }}
+                              disabled={index === formData.steps.length - 1}
+                              className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                            >
+                              <ChevronDown size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removeStep(index); }}
+                              className="p-1 text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Step Details (Expanded) */}
+                        {activeStepIndex === index && (
+                          <div className="p-4 border-t border-slate-700 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-400">ステップタイトル</label>
+                                <input
+                                  type="text"
+                                  value={step.title}
+                                  onChange={(e) => updateStep(index, 'title', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white"
+                                  placeholder="例: 現在地の確認"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-400">検証タイプ</label>
+                                <select
+                                  value={step.validationType}
+                                  onChange={(e) => {
+                                    updateStep(index, 'validationType', e.target.value as ValidationType);
+                                    updateStep(index, 'validationParams', {});
+                                  }}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white"
+                                >
+                                  <option value="command_match">コマンド完全一致</option>
+                                  <option value="command_contains">コマンド部分一致</option>
+                                  <option value="output_contains">出力に文字含む</option>
+                                  <option value="file_exists">ファイル存在確認</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-bold mb-1 text-slate-400">指示内容</label>
+                              <textarea
+                                value={step.instruction}
+                                onChange={(e) => updateStep(index, 'instruction', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white h-20"
+                                placeholder="例: `pwd` コマンドを使用して、現在のディレクトリパスを確認してください。"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-bold mb-1 text-slate-400">ヒント（任意）</label>
+                                <input
+                                  type="text"
+                                  value={step.hint}
+                                  onChange={(e) => updateStep(index, 'hint', e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white"
+                                  placeholder="例: pwd はPrint Working Directoryの略です"
+                                />
+                              </div>
+                              {getValidationParamsUI(step, index)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isLocked"
-                  checked={formData.isLocked}
-                  onChange={(e) => setFormData({ ...formData, isLocked: e.target.checked })}
-                  className="rounded"
-                />
-                <label htmlFor="isLocked" className="text-sm font-bold">ロック状態（ユーザーが実行できません）</label>
-              </div>
-
+              {/* Submit Buttons */}
               <div className="flex gap-4">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-bold py-2 rounded-lg transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-bold py-3 rounded-lg transition-colors"
                 >
                   <Save size={20} /> {loading ? '保存中...' : '保存'}
                 </button>
@@ -255,8 +529,10 @@ export const Admin = () => {
                   onClick={() => {
                     setShowForm(false);
                     setEditingId(null);
+                    setFormData(initialFormData);
+                    setActiveStepIndex(null);
                   }}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 rounded-lg transition-colors"
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg transition-colors"
                 >
                   キャンセル
                 </button>
@@ -270,7 +546,7 @@ export const Admin = () => {
           <div className="p-6 border-b border-slate-700">
             <h2 className="text-xl font-bold">ミッション一覧</h2>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-900">
@@ -295,7 +571,7 @@ export const Admin = () => {
                     </td>
                     <td className="px-6 py-4">{mission.xp} XP</td>
                     <td className="px-6 py-4">
-                      {mission.isLocked ? '🔒 ロック中' : '🔓 公開中'}
+                      {mission.is_locked ? '🔒 ロック中' : '🔓 公開中'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">

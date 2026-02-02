@@ -59,6 +59,31 @@ export const normalizePath = (cwd: string, relativePath: string): string => {
   return '/' + parts.join('/');
 };
 
+// オプション解析ヘルパー（-la -> -l, -a のように展開）
+const parseOptions = (options: string[]): Set<string> => {
+  const flags = new Set<string>();
+  options.forEach(opt => {
+    if (opt.startsWith('--')) {
+      flags.add(opt.slice(2));
+    } else if (opt.startsWith('-')) {
+      opt.slice(1).split('').forEach(char => flags.add(char));
+    }
+  });
+  return flags;
+};
+
+// ディレクトリサイズ計算（再帰）
+const calculateDirSize = (node: FileSystemNode): number => {
+  if (node.type === 'file') return (node.content || '').length;
+  if (!node.children) return 4096; // 空ディレクトリの基本サイズ
+  
+  let size = 4096;
+  Object.values(node.children).forEach(child => {
+    size += calculateDirSize(child);
+  });
+  return size;
+};
+
 export const executeCommand = (
   cmd: string, 
   args: string[], 
@@ -79,249 +104,429 @@ export const executeCommand = (
     case 'pwd':
       return cwd;
     
-    case 'ls':
-      const { options: lsOptions, params: lsParams } = parseArgs(args);
-      const lsTargetPath = lsParams[0] || '.';
-      const lsTargetNode = resolvePath(fs, cwd, lsTargetPath);
-      if (!lsTargetNode) return `ls: cannot access '${lsTargetPath}': No such file or directory`;
-      if (lsTargetNode.type === 'file') return lsTargetNode.name;
+    case 'ls': {
+      const { options: lsOptionsRaw, params: lsParams } = parseArgs(args);
+      const opts = parseOptions(lsOptionsRaw);
       
-      if (!lsTargetNode.children) return '';
-      
-      const lsShowDetails = lsOptions.includes('-la') || lsOptions.includes('-l');
-      
-      return Object.values(lsTargetNode.children).map(child => {
-        if (lsShowDetails) {
-          return `${formatPermissions(child)} 1 user user 4096 Oct 25 10:00 ${child.name}`;
+      const lsTargets = lsParams.length > 0 ? lsParams : ['.'];
+      const results: string[] = [];
+
+      // 再帰表示用関数
+      const listDir = (path: string, node: FileSystemNode, showHeader: boolean = false): string => {
+        let output = '';
+        if (showHeader) output += `${path}:\n`;
+
+        if (node.type === 'file') return node.name;
+        if (!node.children) return '';
+
+        const items = Object.values(node.children).filter(child => 
+          opts.has('a') || !child.name.startsWith('.')
+        );
+
+        if (opts.has('l')) {
+          const lines = items.map(child => {
+            const size = child.type === 'directory' ? 4096 : (child.content || '').length;
+            const sizeStr = opts.has('h') 
+              ? (size > 1024 ? `${(size/1024).toFixed(1)}K` : size) 
+              : size;
+            return `${formatPermissions(child)} 1 user user ${String(sizeStr).padStart(5)} Oct 25 10:00 ${child.name}`;
+          });
+          output += lines.join('\n');
+        } else {
+          output += items.map(i => i.name).join('  ');
         }
-        return child.name;
-      }).join(lsShowDetails ? '\n' : '  ');
+
+        if (opts.has('R')) {
+          const dirs = items.filter(i => i.type === 'directory');
+          dirs.forEach(dir => {
+            output += '\n\n' + listDir(path === '/' ? `/${dir.name}` : `${path}/${dir.name}`, dir, true);
+          });
+        }
+        return output;
+      };
+
+      for (const target of lsTargets) {
+        const node = resolvePath(fs, cwd, target);
+        if (!node) {
+          results.push(`ls: cannot access '${target}': No such file or directory`);
+          continue;
+        }
+        results.push(listDir(target, node, lsTargets.length > 1 || opts.has('R')));
+      }
+      return results.join('\n');
+    }
 
     case 'cd':
       const { params: cdParams } = parseArgs(args);
-      if (!cdParams[0]) return '';
-      const newDir = resolvePath(fs, cwd, cdParams[0]);
-      if (!newDir) return `cd: ${cdParams[0]}: No such file or directory`;
-      if (newDir.type !== 'directory') return `cd: ${cdParams[0]}: Not a directory`;
+      const targetDir = cdParams[0] || '/home/student'; // Default to home
+      const newDir = resolvePath(fs, cwd, targetDir);
       
-      const newPath = normalizePath(cwd, cdParams[0]);
+      if (!newDir) return `cd: ${targetDir}: No such file or directory`;
+      if (newDir.type !== 'directory') return `cd: ${targetDir}: Not a directory`;
+      
+      const newPath = normalizePath(cwd, targetDir);
       setCwd(newPath);
       return '';
 
-    case 'mkdir':
-      const { options: mkdirOptions, params: mkdirParams } = parseArgs(args);
-      if (!mkdirParams[0]) return 'mkdir: missing operand';
+    case 'mkdir': {
+      const { options: mkdirOptionsRaw, params: mkdirParams } = parseArgs(args);
+      const opts = parseOptions(mkdirOptionsRaw);
       
-      const mkdirCreateParents = mkdirOptions.includes('-p');
-      const currentDirNode = resolvePath(fs, cwd, '.');
-      if (currentDirNode && currentDirNode.children) {
-        if (currentDirNode.children[mkdirParams[0]] && !mkdirCreateParents) {
-          return `mkdir: cannot create directory '${mkdirParams[0]}': File exists`;
-        }
+      if (mkdirParams.length === 0) return 'mkdir: missing operand';
+
+      const newFs = JSON.parse(JSON.stringify(fs));
+      let success = true;
+      let errorMsg = '';
+
+      for (const dirPath of mkdirParams) {
+        const parentPath = dirPath.split('/').slice(0, -1).join('/') || '.';
+        const dirName = dirPath.split('/').pop() || '';
         
-        const newFs = JSON.parse(JSON.stringify(fs));
-        const nodeToUpdate = resolvePath(newFs, cwd, '.');
-        if (nodeToUpdate && nodeToUpdate.children) {
-          if (!nodeToUpdate.children[mkdirParams[0]]) {
-            nodeToUpdate.children[mkdirParams[0]] = {
-              name: mkdirParams[0],
-              type: 'directory',
-              permissions: 'drwxr-xr-x',
-              children: {}
-            };
-          }
-          setFs(newFs);
+        let parentNode = resolvePath(newFs, cwd, parentPath);
+        
+        // -p オプション: 親ディレクトリも作成
+        if (!parentNode && opts.has('p')) {
+          // 簡易実装: 親ディレクトリを再帰的に作成するロジックが必要だが、
+          // ここでは1階層上の作成ロジックに留めるか、親が存在しない場合にエラーとする
+          // 本格的な -p 実装は複雑なため、既存パス解決に依存
+          // ここでは単純化のため、既存ロジックを使用
+        }
+
+        if (parentNode && parentNode.children) {
+           if (parentNode.children[dirName] && !opts.has('p')) {
+             errorMsg = `mkdir: cannot create directory '${dirName}': File exists`;
+             success = false;
+             break;
+           }
+           if (!parentNode.children[dirName]) {
+             parentNode.children[dirName] = {
+               name: dirName,
+               type: 'directory',
+               permissions: 'drwxr-xr-x',
+               children: {}
+             };
+           }
+        } else {
+           errorMsg = `mkdir: cannot create directory '${dirName}': No such file or directory`;
+           success = false;
         }
       }
-      return '';
 
-    case 'touch':
+      if (success) setFs(newFs);
+      return errorMsg;
+    }
+
+    case 'touch': {
       const { params: touchParams } = parseArgs(args);
-      if (!touchParams[0]) return 'touch: missing operand';
+      if (touchParams.length === 0) return 'touch: missing operand';
       
-      const currDir = resolvePath(fs, cwd, '.');
-      if (currDir && currDir.children) {
-        const newFs = JSON.parse(JSON.stringify(fs));
-        const nodeToUpdate = resolvePath(newFs, cwd, '.');
-        if (nodeToUpdate && nodeToUpdate.children) {
-          // Create multiple files if specified
-          touchParams.forEach(filename => {
-            nodeToUpdate.children![filename] = {
-              name: filename,
+      const newFs = JSON.parse(JSON.stringify(fs));
+      
+      for (const filename of touchParams) {
+        // パス解決
+        const parts = filename.split('/');
+        const name = parts.pop()!;
+        const dirPath = parts.length > 0 ? parts.join('/') : '.';
+        
+        const dirNode = resolvePath(newFs, cwd, dirPath);
+        if (dirNode && dirNode.children) {
+          if (!dirNode.children[name]) {
+            dirNode.children[name] = {
+              name: name,
               type: 'file',
               permissions: '-rw-r--r--',
               content: ''
             };
-          });
-          setFs(newFs);
+          }
+           // 既に存在する場合はタイムスタンプ更新（今回はシミュレーションなし）
         }
       }
+      setFs(newFs);
       return '';
+    }
 
-    case 'cat':
-      const { params: catParams } = parseArgs(args);
-      if (!catParams[0]) return 'cat: missing operand';
+    case 'cat': {
+      const { options: catOptionsRaw, params: catParams } = parseArgs(args);
+      const opts = parseOptions(catOptionsRaw);
       
-      const catNode = resolvePath(fs, cwd, catParams[0]);
-      if (!catNode) return `cat: ${catParams[0]}: No such file or directory`;
-      if (catNode.type === 'directory') return `cat: ${catParams[0]}: Is a directory`;
-      return catNode.content || '';
+      if (catParams.length === 0) return 'cat: missing operand';
+      
+      let output = '';
+      for (const file of catParams) {
+        const node = resolvePath(fs, cwd, file);
+        if (!node) {
+          output += `cat: ${file}: No such file or directory\n`;
+          continue;
+        }
+        if (node.type === 'directory') {
+          output += `cat: ${file}: Is a directory\n`;
+          continue;
+        }
+        
+        let content = node.content || '';
+        if (opts.has('n')) {
+          content = content.split('\n').map((line, i) => `${String(i + 1).padStart(6)}\t${line}`).join('\n');
+        }
+        output += content + (catParams.length > 1 ? '\n' : '');
+      }
+      return output.trimEnd();
+    }
 
-    case 'rm':
-      const { params: rmParams } = parseArgs(args);
-      if (!rmParams[0]) return 'rm: missing operand';
+    case 'rm': {
+      const { options: rmOptionsRaw, params: rmParams } = parseArgs(args);
+      const opts = parseOptions(rmOptionsRaw);
       
-      const rmCurrentDir = resolvePath(fs, cwd, '.');
-      if (rmCurrentDir && rmCurrentDir.children && rmCurrentDir.children[rmParams[0]]) {
-        const newFs = JSON.parse(JSON.stringify(fs));
-        const nodeToUpdateRm = resolvePath(newFs, cwd, '.');
-        if (nodeToUpdateRm && nodeToUpdateRm.children) {
-          delete nodeToUpdateRm.children[rmParams[0]];
-          setFs(newFs);
+      if (rmParams.length === 0) return 'rm: missing operand';
+      
+      const newFs = JSON.parse(JSON.stringify(fs));
+      
+      for (const target of rmParams) {
+        // 親ディレクトリを取得
+        const parts = normalizePath(cwd, target).split('/');
+        const name = parts.pop()!;
+        const parentPath = parts.join('/') || '/';
+        
+        const parentNode = resolvePath(newFs, '/', parentPath); // 絶対パスで解決
+        
+        if (parentNode && parentNode.children && parentNode.children[name]) {
+          const targetNode = parentNode.children[name];
+          if (targetNode.type === 'directory' && !opts.has('r') && !opts.has('R')) {
+            return `rm: cannot remove '${target}': Is a directory`;
+          }
+          delete parentNode.children[name];
+        } else if (!opts.has('f')) {
+          return `rm: cannot remove '${target}': No such file or directory`;
         }
       }
+      setFs(newFs);
       return '';
+    }
 
-    case 'cp':
-      const { params: cpParams } = parseArgs(args);
+    case 'cp': {
+      const { options: cpOptionsRaw, params: cpParams } = parseArgs(args);
+      const opts = parseOptions(cpOptionsRaw);
+      
       if (cpParams.length < 2) return 'cp: missing operand';
       
-      const cpSourceNode = resolvePath(fs, cwd, cpParams[0]);
-      if (!cpSourceNode) return `cp: cannot open '${cpParams[0]}' for reading: No such file or directory`;
-      if (cpSourceNode.type === 'directory') return `cp: '${cpParams[0]}' is a directory (not copied)`;
+      const dest = cpParams.pop()!;
+      const sources = cpParams;
+      const newFs = JSON.parse(JSON.stringify(fs));
       
-      const cpCurrentDir = resolvePath(fs, cwd, '.');
-      if (cpCurrentDir && cpCurrentDir.children) {
-        const newFs = JSON.parse(JSON.stringify(fs));
-        const nodeToUpdateCp = resolvePath(newFs, cwd, '.');
-        if (nodeToUpdateCp && nodeToUpdateCp.children) {
-          nodeToUpdateCp.children[cpParams[1]] = {
-            name: cpParams[1],
-            type: 'file',
-            permissions: cpSourceNode.permissions || '-rw-r--r--',
-            content: cpSourceNode.content || ''
-          };
-          setFs(newFs);
+      // 送信先がディレクトリか確認
+      const destNode = resolvePath(newFs, cwd, dest);
+      const isDestDir = destNode?.type === 'directory';
+      
+      if (sources.length > 1 && !isDestDir) {
+        return `cp: target '${dest}' is not a directory`;
+      }
+
+      for (const src of sources) {
+        const srcNode = resolvePath(newFs, cwd, src); // 元のFSから取得したほうが安全だが簡略化のためnewFs使用
+        if (!srcNode) return `cp: cannot stat '${src}': No such file or directory`;
+        
+        if (srcNode.type === 'directory' && !opts.has('r') && !opts.has('R')) {
+          return `cp: -r not specified; omitting directory '${src}'`;
+        }
+
+        // コピー処理
+        const copyNode = JSON.parse(JSON.stringify(srcNode)); // Deep copy
+        
+        if (isDestDir) {
+           // ディレクトリの中にコピー
+           if (destNode && destNode.children) {
+             destNode.children[srcNode.name] = copyNode;
+           }
+        } else {
+           // ファイルとしてコピー（リネーム）
+           const parentParts = dest.split('/');
+           const newName = parentParts.pop()!;
+           const parentPath = parentParts.length > 0 ? parentParts.join('/') : '.';
+           const parentNode = resolvePath(newFs, cwd, parentPath);
+           if (parentNode && parentNode.children) {
+             copyNode.name = newName;
+             parentNode.children[newName] = copyNode;
+           }
         }
       }
+      setFs(newFs);
       return '';
+    }
 
-    case 'mv':
+    case 'mv': {
       const { params: mvParams } = parseArgs(args);
       if (mvParams.length < 2) return 'mv: missing operand';
       
-      const mvSourceNode = resolvePath(fs, cwd, mvParams[0]);
-      if (!mvSourceNode) return `mv: cannot stat '${mvParams[0]}': No such file or directory`;
+      const src = mvParams[0];
+      const dest = mvParams[1];
       
-      const mvCurrentDir = resolvePath(fs, cwd, '.');
-      if (mvCurrentDir && mvCurrentDir.children && mvCurrentDir.children[mvParams[0]]) {
-        const newFs = JSON.parse(JSON.stringify(fs));
-        const nodeToUpdateMv = resolvePath(newFs, cwd, '.');
-        if (nodeToUpdateMv && nodeToUpdateMv.children) {
-          const item = nodeToUpdateMv.children[mvParams[0]];
-          delete nodeToUpdateMv.children[mvParams[0]];
-          item.name = mvParams[1];
-          nodeToUpdateMv.children[mvParams[1]] = item;
-          setFs(newFs);
+      // 元の存在確認
+      const srcNode = resolvePath(fs, cwd, src);
+      if (!srcNode) return `mv: cannot stat '${src}': No such file or directory`;
+      
+      const newFs = JSON.parse(JSON.stringify(fs));
+      
+      // 元を削除するための親取得
+      const srcParts = normalizePath(cwd, src).split('/');
+      const srcName = srcParts.pop()!;
+      const srcParentPath = srcParts.join('/') || '/';
+      const srcParent = resolvePath(newFs, '/', srcParentPath);
+      
+      if (!srcParent || !srcParent.children) return 'mv: error';
+      
+      // オブジェクトを取り出す
+      const nodeToMove = srcParent.children[srcName];
+      delete srcParent.children[srcName];
+      
+      // 先の解決
+      const destNode = resolvePath(newFs, cwd, dest);
+      
+      if (destNode && destNode.type === 'directory') {
+        // ディレクトリへの移動
+        destNode.children![nodeToMove.name] = nodeToMove;
+      } else {
+        // リネームまたは新規配置
+        const destParts = normalizePath(cwd, dest).split('/');
+        const destName = destParts.pop()!;
+        const destParentPath = destParts.join('/') || '/';
+        const destParent = resolvePath(newFs, '/', destParentPath);
+        
+        if (destParent && destParent.children) {
+          nodeToMove.name = destName;
+          destParent.children[destName] = nodeToMove;
+        } else {
+           return `mv: cannot move to '${dest}': No such directory`;
         }
       }
+      
+      setFs(newFs);
       return '';
+    }
 
-    case 'grep':
-      const { params: grepParams } = parseArgs(args);
+    case 'grep': {
+      const { options: grepOptionsRaw, params: grepParams } = parseArgs(args);
+      const opts = parseOptions(grepOptionsRaw);
+      
       if (grepParams.length < 2) return 'grep: missing operand';
       
-      const grepPattern = grepParams[0];
-      const grepFilePath = grepParams[1];
-      const grepFileNode = resolvePath(fs, cwd, grepFilePath);
+      const pattern = grepParams[0];
+      const files = grepParams.slice(1);
       
-      if (!grepFileNode) return `grep: ${grepFilePath}: No such file or directory`;
-      if (grepFileNode.type === 'directory') return `grep: ${grepFilePath}: Is a directory`;
+      let output = '';
       
-      const grepContent = grepFileNode.content || '';
-      
-      // Debug log
-      console.log('grep search:', { grepPattern, grepFilePath, grepContent, cwd });
-      
-      const grepLines = grepContent.split('\n');
-      
-      // Search for lines containing the pattern (case-insensitive)
-      const grepMatches: string[] = [];
-      for (const line of grepLines) {
-        if (line.toLowerCase().includes(grepPattern.toLowerCase())) {
-          grepMatches.push(line);
+      for (const file of files) {
+        const node = resolvePath(fs, cwd, file);
+        if (!node) {
+          if (!opts.has('s')) output += `grep: ${file}: No such file or directory\n`;
+          continue;
+        }
+        if (node.type === 'directory') {
+          output += `grep: ${file}: Is a directory\n`;
+          continue;
+        }
+        
+        const lines = (node.content || '').split('\n');
+        let matches = 0;
+        
+        lines.forEach((line, idx) => {
+          const matchLine = opts.has('i') ? line.toLowerCase() : line;
+          const matchPat = opts.has('i') ? pattern.toLowerCase() : pattern;
+          const isMatch = opts.has('v') ? !matchLine.includes(matchPat) : matchLine.includes(matchPat);
+          
+          if (isMatch) {
+            matches++;
+            if (!opts.has('c')) {
+              let prefix = '';
+              if (files.length > 1) prefix += `${file}:`;
+              if (opts.has('n')) prefix += `${idx + 1}:`;
+              output += `${prefix}${line}\n`;
+            }
+          }
+        });
+        
+        if (opts.has('c')) {
+          output += files.length > 1 ? `${file}:${matches}\n` : `${matches}\n`;
         }
       }
-      
-      console.log('grep matches:', grepMatches);
-      
-      // Return all matching lines joined by newline
-      if (grepMatches.length > 0) {
-        return grepMatches.join('\n');
-      }
-      // If no matches, return a special marker that shows in terminal
-      return '[no match found]';
+      return output.trimEnd();
+    }
 
     case 'find':
       const { params: findParams } = parseArgs(args);
       const findPath = findParams[0] || '.';
-      const findName = findParams[findParams.indexOf('-name') + 1] || '*';
+      const nameIdx = args.indexOf('-name');
+      const findName = nameIdx !== -1 ? args[nameIdx + 1] : '*';
       
       const findNode = resolvePath(fs, cwd, findPath);
       if (!findNode) return `find: '${findPath}': No such file or directory`;
       
-      const results: string[] = [];
-      
-      const traverse = (node: FileSystemNode, path: string) => {
-        if (findName === '*' || node.name.includes(findName)) {
-          results.push(path);
-        }
+      const findResults: string[] = [];
+      const traverseFind = (node: FileSystemNode, currentPath: string) => {
+        // globパターンの簡易実装（*のみ対応）
+        const match = findName === '*' || 
+                      (findName.startsWith('*') && node.name.endsWith(findName.slice(1))) ||
+                      (findName.endsWith('*') && node.name.startsWith(findName.slice(0, -1))) ||
+                      node.name === findName;
+
+        if (match) findResults.push(currentPath);
+        
         if (node.children) {
           Object.values(node.children).forEach(child => {
-            traverse(child, path === '/' ? `/${child.name}` : `${path}/${child.name}`);
+            traverseFind(child, currentPath === '/' ? `/${child.name}` : `${currentPath}/${child.name}`);
           });
         }
       };
       
-      traverse(findNode, findPath === '.' ? cwd : findPath);
-      return results.length > 0 ? results.join('\n') : '';
+      traverseFind(findNode, findPath === '.' ? cwd : (findPath.startsWith('/') ? findPath : normalizePath(cwd, findPath)));
+      return findResults.join('\n');
 
     case 'head':
-      const { options: headOptions, params: headParams } = parseArgs(args);
-      if (!headParams[0]) return 'head: missing operand';
+    case 'tail': {
+      const { options: htOptionsRaw, params: htParams } = parseArgs(args);
+      const isHead = cmd === 'head';
       
-      const headLines = 10; // Default 10 lines
-      const headFile = resolvePath(fs, cwd, headParams[0]);
-      if (!headFile) return `head: cannot open '${headParams[0]}': No such file or directory`;
-      if (headFile.type === 'directory') return `head: ${headParams[0]}: Is a directory`;
+      // オプション解析 (-n 5 or -5)
+      let lines = 10;
+      const nIndex = args.indexOf('-n');
+      if (nIndex !== -1 && args[nIndex+1]) {
+         lines = parseInt(args[nIndex+1], 10);
+      } else {
+         // -5 のような形式を探す
+         const numOpt = args.find(a => /^-\d+$/.test(a));
+         if (numOpt) lines = parseInt(numOpt.slice(1), 10);
+      }
       
-      const headContent = (headFile.content || '').split('\n').slice(0, headLines).join('\n');
-      return headContent;
-
-    case 'tail':
-      const { options: tailOptions, params: tailParams } = parseArgs(args);
-      if (!tailParams[0]) return 'tail: missing operand';
+      const file = htParams.find(p => !p.startsWith('-')) || '';
+      if (!file) return `${cmd}: missing operand`;
       
-      const tailLines = 10; // Default 10 lines
-      const tailFile = resolvePath(fs, cwd, tailParams[0]);
-      if (!tailFile) return `tail: cannot open '${tailParams[0]}': No such file or directory`;
-      if (tailFile.type === 'directory') return `tail: ${tailParams[0]}: Is a directory`;
+      const node = resolvePath(fs, cwd, file);
+      if (!node) return `${cmd}: cannot open '${file}': No such file or directory`;
       
-      const tailContent = (tailFile.content || '').split('\n').slice(-tailLines).join('\n');
-      return tailContent;
+      const content = (node.content || '').split('\n');
+      const result = isHead ? content.slice(0, lines) : content.slice(-lines);
+      return result.join('\n');
+    }
 
     case 'chmod':
+      // 簡易実装（パーミッション文字列の変更のみ）
       const { params: chmodParams } = parseArgs(args);
       if (chmodParams.length < 2) return 'chmod: missing operand';
       
-      const chmodNode = resolvePath(fs, cwd, chmodParams[1]);
-      if (!chmodNode) return `chmod: cannot access '${chmodParams[1]}': No such file or directory`;
+      const mode = chmodParams[0];
+      const target = chmodParams[1];
+      const newFsChmod = JSON.parse(JSON.stringify(fs));
+      const nodeChmod = resolvePath(newFsChmod, cwd, target);
       
-      const newFs = JSON.parse(JSON.stringify(fs));
-      const chmodUpdateNode = resolvePath(newFs, cwd, chmodParams[1]);
-      if (chmodUpdateNode) {
-        chmodUpdateNode.permissions = chmodParams[0];
-        setFs(newFs);
+      if (nodeChmod) {
+        // 数値モード(755等)や+x等は複雑なので、ここでは単純に文字列を上書きするか、
+        // 755 -> drwxr-xr-x 変換のような簡易ロジックを入れる
+        if (mode === '755') nodeChmod.permissions = nodeChmod.type === 'directory' ? 'drwxr-xr-x' : '-rwxr-xr-x';
+        else if (mode === '644') nodeChmod.permissions = '-rw-r--r--';
+        else if (mode === '+x') nodeChmod.permissions = nodeChmod.permissions?.replace(/-/g, 'x') || '-rwxr-xr-x';
+        else nodeChmod.permissions = mode; // Fallback
+        
+        setFs(newFsChmod);
+      } else {
+        return `chmod: cannot access '${target}': No such file or directory`;
       }
       return '';
 
@@ -331,76 +536,268 @@ export const executeCommand = (
     case 'date':
       return new Date().toString();
 
-    case 'wc':
-      const { params: wcParams } = parseArgs(args);
-      if (!wcParams[0]) return 'wc: missing operand';
+    case 'wc': {
+      const { options: wcOptionsRaw, params: wcParams } = parseArgs(args);
+      const opts = parseOptions(wcOptionsRaw);
       
-      const wcFile = resolvePath(fs, cwd, wcParams[0]);
-      if (!wcFile) return `wc: ${wcParams[0]}: No such file or directory`;
-      if (wcFile.type === 'directory') return `wc: ${wcParams[0]}: Is a directory`;
+      if (wcParams.length === 0) return 'wc: missing operand';
       
-      const wcContent = wcFile.content || '';
-      const wcLines = wcContent.split('\n').length - (wcContent.endsWith('\n') ? 1 : 0);
-      const wcWords = wcContent.split(/\s+/).filter(w => w).length;
-      const wcChars = wcContent.length;
+      const node = resolvePath(fs, cwd, wcParams[0]);
+      if (!node) return `wc: ${wcParams[0]}: No such file or directory`;
       
-      return `  ${wcLines}  ${wcWords}  ${wcChars} ${wcParams[0]}`;
+      const content = node.content || '';
+      const l = content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
+      const w = content.split(/\s+/).filter(x => x).length;
+      const c = content.length;
+      
+      let out = '';
+      if (opts.has('l')) out += `${l.toString().padStart(4)} `;
+      if (opts.has('w')) out += `${w.toString().padStart(4)} `;
+      if (opts.has('c')) out += `${c.toString().padStart(4)} `;
+      
+      if (!opts.has('l') && !opts.has('w') && !opts.has('c')) {
+        out = `${l.toString().padStart(4)} ${w.toString().padStart(4)} ${c.toString().padStart(4)} `;
+      }
+      
+      return `${out}${wcParams[0]}`;
+    }
+
+    case 'echo': {
+      const fullArgs = args.join(' ');
+      // リダイレクト処理
+      let text = fullArgs;
+      let targetFile = '';
+      let append = false;
+      
+      if (fullArgs.includes('>>')) {
+        const parts = fullArgs.split('>>');
+        text = parts[0];
+        targetFile = parts[1].trim();
+        append = true;
+      } else if (fullArgs.includes('>')) {
+        const parts = fullArgs.split('>');
+        text = parts[0];
+        targetFile = parts[1].trim();
+      }
+      
+      // クォート削除
+      text = text.trim();
+      if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
+        text = text.slice(1, -1);
+      }
+      
+      if (targetFile) {
+        const newFs = JSON.parse(JSON.stringify(fs));
+        // 親ディレクトリ解決
+        const parts = normalizePath(cwd, targetFile).split('/');
+        const fileName = parts.pop()!;
+        const dirPath = parts.join('/') || '/';
+        const dirNode = resolvePath(newFs, '/', dirPath);
+        
+        if (dirNode && dirNode.children) {
+          if (dirNode.children[fileName] && append) {
+            dirNode.children[fileName].content += '\n' + text;
+          } else {
+            dirNode.children[fileName] = {
+              name: fileName,
+              type: 'file',
+              permissions: '-rw-r--r--',
+              content: text
+            };
+          }
+          setFs(newFs);
+        } else {
+          return `bash: ${targetFile}: No such file or directory`;
+        }
+        return '';
+      }
+      return text;
+    }
+
+    // --- 新規追加コマンド ---
+
+    case 'sort': {
+      const { opts: sortOpts, params: sortParams } = { opts: parseOptions(parseArgs(args).options), params: parseArgs(args).params }; 
+      if (sortParams.length === 0) return 'sort: missing operand';
+      
+      const node = resolvePath(fs, cwd, sortParams[0]);
+      if (!node || node.type !== 'file') return `sort: cannot read: ${sortParams[0]}`;
+      
+      const lines = (node.content || '').split('\n').filter(l => l);
+      lines.sort();
+      if (sortOpts.has('r')) lines.reverse();
+      
+      return lines.join('\n');
+    }
+
+    case 'uniq': {
+      const { params: uniqParams } = parseArgs(args);
+      if (uniqParams.length === 0) return 'uniq: missing operand';
+      
+      const node = resolvePath(fs, cwd, uniqParams[0]);
+      if (!node || node.type !== 'file') return `uniq: cannot read: ${uniqParams[0]}`;
+      
+      const lines = (node.content || '').split('\n');
+      const uniqueLines = lines.filter((line, index) => line !== lines[index - 1]);
+      return uniqueLines.join('\n');
+    }
+
+    case 'cut': {
+      // 簡易版: cut -d " " -f 1 file
+      const dIndex = args.indexOf('-d');
+      const fIndex = args.indexOf('-f');
+      const fileName = args.find(a => !a.startsWith('-') && a !== args[dIndex+1] && a !== args[fIndex+1]);
+      
+      if (!fileName) return 'cut: missing operand';
+      
+      const delimiter = dIndex !== -1 ? args[dIndex+1].replace(/['"]/g, '') : '\t';
+      const fields = fIndex !== -1 ? args[fIndex+1] : '1';
+      
+      const node = resolvePath(fs, cwd, fileName);
+      if (!node || node.type !== 'file') return `cut: cannot read: ${fileName}`;
+      
+      const fieldIdx = parseInt(fields, 10) - 1;
+      return (node.content || '').split('\n').map(line => {
+        return line.split(delimiter)[fieldIdx] || '';
+      }).join('\n');
+    }
+
+    case 'diff': {
+      const { params: diffParams } = parseArgs(args);
+      if (diffParams.length < 2) return 'diff: missing operand';
+      
+      const file1 = resolvePath(fs, cwd, diffParams[0]);
+      const file2 = resolvePath(fs, cwd, diffParams[1]);
+      
+      if (!file1 || !file2) return 'diff: No such file';
+      
+      if (file1.content === file2.content) return '';
+      return `Files ${diffParams[0]} and ${diffParams[1]} differ`;
+    }
+
+    case 'tree': {
+      // 簡易ツリー表示
+      const { params: treeParams } = parseArgs(args);
+      const target = treeParams[0] || '.';
+      const root = resolvePath(fs, cwd, target);
+      if (!root) return `${target} [error opening dir]`;
+      
+      let out = target === '.' ? '.' : target;
+      
+      const buildTree = (node: FileSystemNode, prefix: string) => {
+        if (!node.children) return;
+        const keys = Object.keys(node.children);
+        keys.forEach((key, idx) => {
+          const isLast = idx === keys.length - 1;
+          const child = node.children![key];
+          out += `\n${prefix}${isLast ? '└── ' : '├── '}${key}`;
+          if (child.type === 'directory') {
+            buildTree(child, prefix + (isLast ? '    ' : '│   '));
+          }
+        });
+      };
+      
+      buildTree(root, '');
+      return out;
+    }
+
+    case 'du': {
+      const { params: duParams } = parseArgs(args);
+      const target = duParams[0] || '.';
+      const node = resolvePath(fs, cwd, target);
+      if (!node) return `du: cannot access '${target}'`;
+      
+      const size = calculateDirSize(node);
+      return `${Math.ceil(size/1024)}\t${target}`;
+    }
+
+    case 'df':
+      return `Filesystem     1K-blocks    Used Available Use% Mounted on
+/dev/sda1        8192000 4096000   4096000  50% /
+tmpfs             102400       0    102400   0% /dev/shm`;
+
+    case 'ps':
+      return `  PID TTY          TIME CMD
+ 1001 pts/0    00:00:00 bash
+ 1002 pts/0    00:00:00 ps`;
+
+    case 'kill':
+      return ''; // No-op
+
+    case 'basename': {
+      const { params } = parseArgs(args);
+      if (!params[0]) return 'basename: missing operand';
+      return params[0].split('/').pop() || '';
+    }
+
+    case 'dirname': {
+      const { params } = parseArgs(args);
+      if (!params[0]) return 'dirname: missing operand';
+      const parts = params[0].split('/');
+      parts.pop();
+      return parts.join('/') || '.';
+    }
+    
+    case 'ln': {
+        const { options: lnOptionsRaw, params: lnParams } = parseArgs(args);
+        const opts = parseOptions(lnOptionsRaw);
+        if (lnParams.length < 2) return 'ln: missing operand';
+        // シンボリックリンクシミュレーション
+        if (opts.has('s')) {
+           const newFs = JSON.parse(JSON.stringify(fs));
+           const target = lnParams[0];
+           const linkName = lnParams[1];
+           
+           const parts = linkName.split('/');
+           const name = parts.pop()!;
+           const parentPath = parts.join('/') || '.';
+           
+           const parent = resolvePath(newFs, cwd, parentPath);
+           if (parent && parent.children) {
+               parent.children[name] = {
+                   name: name,
+                   type: 'file', // 簡易的にファイルとして扱う
+                   permissions: 'lrwxrwxrwx',
+                   content: `-> ${target}` // 内容でリンク先を示す
+               };
+               setFs(newFs);
+               return '';
+           }
+        }
+        return 'ln: hard links not supported (use -s)';
+    }
 
     case 'man':
       const { params: manParams } = parseArgs(args);
-      const manualPages: { [key: string]: string } = {
-        'ls': 'ls - list directory contents\nUSAGE: ls [OPTIONS] [FILE]...\nOPTIONS:\n  -l  long listing\n  -a  show all files\n  -la show long listing of all files',
-        'cd': 'cd - change the working directory\nUSAGE: cd [DIR]',
-        'grep': 'grep - search for patterns in files\nUSAGE: grep [OPTIONS] PATTERN [FILE]...',
-        'find': 'find - search for files\nUSAGE: find [PATH] [-name PATTERN]',
-        'cp': 'cp - copy files\nUSAGE: cp SOURCE DEST',
-        'mv': 'mv - move or rename files\nUSAGE: mv SOURCE DEST',
-        'rm': 'rm - remove files\nUSAGE: rm FILE...',
-        'cat': 'cat - concatenate and display files\nUSAGE: cat [FILE]...',
-        'chmod': 'chmod - change file permissions\nUSAGE: chmod MODE FILE',
-      };
+      const cmdHelp = manParams[0];
+      if (!cmdHelp) return 'man: what manual page do you want?';
       
-      if (!manParams[0]) return 'man: what manual page do you want?';
-      const manual = manualPages[manParams[0]];
-      return manual || `No manual entry for ${manParams[0]}`;
-
-    case 'history':
-      return 'Command history not yet implemented';
+      const manuals: Record<string, string> = {
+        ls: 'ls: list directory contents',
+        cd: 'cd: change directory',
+        grep: 'grep: print lines that match patterns',
+        sort: 'sort: sort lines of text files',
+        uniq: 'uniq: report or omit repeated lines',
+        cut: 'cut: remove sections from each line of files',
+        tree: 'tree: list contents of directories in a tree-like format',
+        du: 'du: estimate file space usage',
+        // 他のコマンドも必要に応じて追加
+      };
+      return manuals[cmdHelp] || `No manual entry for ${cmdHelp}`;
 
     case 'help':
       return `Available commands:
-
-FILE OPERATIONS:
-  ls [-la]               List directory contents
-  cat <file>             Display file contents
-  touch <file>           Create file
-  rm <file>              Remove file
-  cp <src> <dest>        Copy file
-  mv <src> <dest>        Move or rename file
-  grep <pattern> <file>  Search in files
-  find <path> [-name]    Search for files
-
-DIRECTORY OPERATIONS:
-  cd <path>              Change directory
-  pwd                    Print working directory
-  mkdir [-p] <name>      Create directory
-
-TEXT OPERATIONS:
-  head <file>            Show first 10 lines
-  tail <file>            Show last 10 lines
-  wc <file>              Count lines, words, characters
-  echo <text>            Print text
-
-PERMISSIONS:
-  chmod <mode> <file>    Change file permissions
-
-SYSTEM:
-  whoami                 Show current user
-  date                   Show current date
-  man <command>          Show manual page
-  history                Show command history
-  clear                  Clear terminal
-  help                   Show this help`;
+      
+File Ops:
+  ls, cp, mv, rm, touch, mkdir, ln, chmod, chown
+  
+Text Ops:
+  cat, head, tail, grep, sort, uniq, cut, wc, echo, diff
+  
+System/Info:
+  cd, pwd, whoami, date, du, df, ps, kill, tree, basename, dirname
+  
+Try 'man <command>' for more information.`;
 
     default:
       return `${cmd}: command not found`;
