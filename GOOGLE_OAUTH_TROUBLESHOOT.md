@@ -40,7 +40,7 @@
 7. **承認済みのリダイレクト URI** に以下を追加：
 
 ```
-https://wxgsxvmhkprtexuwgiun.supabase.co/auth/v1/callback?provider=google
+https://[SUPABASE_PROJECT_ID].supabase.co/auth/v1/callback?provider=google
 ```
 
 ⚠️ **重要**: URL は正確に入力してください（Supabase プロジェクト ID が必要）
@@ -64,7 +64,7 @@ https://wxgsxvmhkprtexuwgiun.supabase.co/auth/v1/callback?provider=google
 npm run dev
 ```
 
-2. http://localhost:5173/login にアクセス
+2. http://localhost:3000/login にアクセス
 3. **Google でログイン** ボタンをクリック
 4. Google ログイン画面が表示されることを確認
 
