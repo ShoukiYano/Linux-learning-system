@@ -59,7 +59,7 @@ export const MissionRunner = () => {
   };
 
   const checkProgress = () => {
-    if (currentStep && currentStep.validation(commandLog)) {
+    if (currentStep && currentStep.validation && currentStep.validation(commandLog)) {
       if (currentStepIndex < mission.steps.length - 1) {
         setCurrentStepIndex(prev => prev + 1);
         setShowHint(false);
