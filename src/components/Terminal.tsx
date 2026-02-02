@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CommandHistory, FileSystemNode } from '../types';
-import { executeCommand } from '../utils/terminalLogic';
+import { executeCommand, resolvePath } from '../utils/terminalLogic';
 import { INITIAL_FILE_SYSTEM } from '../constants';
 import { clsx } from 'clsx';
+import { ErrorTranslator } from './ErrorTranslator';
 
 interface TerminalProps {
   fs?: FileSystemNode;
@@ -51,6 +52,87 @@ export const Terminal: React.FC<TerminalProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      e.preventDefault(); // フォーカス移動を防ぐ
+
+      if (!input.trim()) return;
+
+      const args = input.split(' ');
+      const lastArg = args[args.length - 1];
+      
+      // コマンド自体の補完（最初の引数）またはファイルパスの補完
+      // 今回は簡易的に、ファイルパス補完のみ、またはコマンドリストからの補完を実装
+      
+      // パスの解析
+      const lastSlashIndex = lastArg.lastIndexOf('/');
+      let searchPath = '';
+      let searchPrefix = lastArg;
+
+      if (lastSlashIndex !== -1) {
+        searchPath = lastArg.substring(0, lastSlashIndex);
+        searchPrefix = lastArg.substring(lastSlashIndex + 1);
+        if (searchPath === '') searchPath = '/'; // ルート直下の場合
+      } else {
+        searchPath = '.'; // カレントディレクトリ
+      }
+
+      // 検索対象のディレクトリノードを取得
+      const targetDir = resolvePath(fs, cwd, searchPath);
+
+      if (targetDir && targetDir.type === 'directory' && targetDir.children) {
+        const candidates = Object.keys(targetDir.children).filter(name => 
+          name.startsWith(searchPrefix)
+        );
+
+        if (candidates.length === 1) {
+          // 候補が1つの場合は補完
+          const completion = candidates[0];
+          const newPath = lastSlashIndex !== -1 
+            ? `${searchPath === '/' ? '' : searchPath}/${completion}`
+            : completion;
+            
+          // ディレクトリならスラッシュを付加
+          const isDir = targetDir.children[completion].type === 'directory';
+          const finalCompletion = isDir ? `${newPath}/` : newPath;
+
+          const newArgs = [...args];
+          newArgs[newArgs.length - 1] = finalCompletion;
+          setInput(newArgs.join(' '));
+        } else if (candidates.length > 1) {
+          // 候補が複数の場合は共通部分まで補完するか、候補を表示したいが、
+          // ここではシンプルに、コンソールに出力する（擬似的なTab連打挙動）
+          // 実際には history に候補を表示するのが親切
+          const commonPrefix = candidates.reduce((prefix, current) => {
+            let i = 0;
+            while (i < prefix.length && i < current.length && prefix[i] === current[i]) {
+              i++;
+            }
+            return prefix.substring(0, i);
+          },candidates[0]);
+          
+          if (commonPrefix.length > searchPrefix.length) {
+              // 共通部分までは補完
+            const newPath = lastSlashIndex !== -1 
+              ? `${searchPath === '/' ? '' : searchPath}/${commonPrefix}`
+              : commonPrefix;
+            
+            const newArgs = [...args];
+            newArgs[newArgs.length - 1] = newPath;
+            setInput(newArgs.join(' '));
+          } else {
+             // 候補を表示
+             // 現在の入力行の下に候補を表示し、新しいプロンプトを表示する
+             const candidatesStr = candidates.join('  ');
+             setHistory(prev => [
+               ...prev,
+               { command: input, output: candidatesStr, timestamp: Date.now(), status: 'success', cwd }
+             ]);
+          }
+        }
+      }
+      return;
+    }
+
     if (e.key === 'Enter') {
       const cmdTrimmed = input.trim();
       if (!cmdTrimmed) {
@@ -139,6 +221,9 @@ export const Terminal: React.FC<TerminalProps> = ({
             <div className={clsx("whitespace-pre-wrap mt-1", entry.status === 'error' ? "text-red-400" : "text-slate-300")}>
               {entry.output}
             </div>
+          )}
+          {entry.status === 'error' && entry.output && (
+             <ErrorTranslator command={entry.command} output={typeof entry.output === 'string' ? entry.output : ''} />
           )}
         </div>
       ))}

@@ -22,12 +22,13 @@ export interface Mission {
 }
 
 // 検証タイプの定義
-export type ValidationType = 'command_match' | 'command_contains' | 'output_contains' | 'file_exists';
+export type ValidationType = 'command_match' | 'command_contains' | 'output_contains' | 'file_exists' | 'file_content_match';
 
 export interface ValidationParams {
   command?: string;      // command_match用: 完全一致するコマンド
   pattern?: string;      // command_contains, output_contains用: 含まれるべきパターン
   filePath?: string;     // file_exists用: 存在確認するファイルパス
+  fileContent?: string;  // file_content_match用: ファイルに含まれるべき内容
 }
 
 export interface MissionStep {

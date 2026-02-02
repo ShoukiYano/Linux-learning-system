@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Terminal } from '../components/Terminal';
+import { NanoEditor } from '../components/NanoEditor';
 import { MISSIONS, INITIAL_FILE_SYSTEM } from '../constants';
 import { FileSystemNode, CommandHistory, MissionStep, ValidationType, ValidationParams } from '../types';
 import { ChevronLeft, Play, CheckCircle, HelpCircle, RotateCcw, FolderTree, BookOpen, Zap, Folder, File, Loader2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { db } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
-import { executeCommand, resolvePath } from '../utils/terminalLogic';
+import { executeCommand, resolvePath, writeFile } from '../utils/terminalLogic';
 
 // 検証関数を生成するヘルパー
 const createValidationFunction = (
   validationType: ValidationType,
   validationParams: ValidationParams
-): (history: CommandHistory[]) => boolean => {
+): (history: CommandHistory[], fs: FileSystemNode, cwd: string) => boolean => {
   switch (validationType) {
     case 'command_match':
       return (history) => history.some(h => h.command.trim() === validationParams.command);
@@ -25,12 +26,32 @@ const createValidationFunction = (
       );
     case 'file_exists':
       // ファイル存在確認は現在のファイルシステム状態を見る必要があるため、
-      // ここでは簡易的にlsコマンドの出力をチェック
-      return (history) => history.some(h => 
-        h.command.includes('ls') && 
-        typeof h.output === 'string' && 
-        h.output.includes(validationParams.filePath || '')
-      );
+      // lsコマンドの出力チェックではなく、実際のfsをチェックするように変更推奨だが
+      // 既存の互換性のため両方見れるようにする、あるいはfsをチェックする
+      return (history, fs, cwd) => {
+        // history check (legacy)
+        const inHistory = history.some(h => 
+          h.command.includes('ls') && 
+          typeof h.output === 'string' && 
+          h.output.includes(validationParams.filePath || '')
+        );
+        if (inHistory) return true;
+
+        // actual fs check
+        if (validationParams.filePath) {
+           const node = resolvePath(fs, cwd, validationParams.filePath);
+           return !!node;
+        }
+        return false;
+      };
+    case 'file_content_match':
+      return (_history, fs, cwd) => {
+        if (!validationParams.filePath || validationParams.fileContent === undefined) return false;
+        const node = resolvePath(fs, cwd, validationParams.filePath);
+        if (!node || node.type !== 'file' || typeof node.content !== 'string') return false;
+        // 改行や空白の扱いを少し柔軟にする（trimして比較）
+        return node.content.trim() === validationParams.fileContent.trim();
+      };
     default:
       return () => false;
   }
@@ -76,13 +97,24 @@ export const MissionRunner = () => {
   const [mission, setMission] = useState<MissionData | null>(null);
   const [loadingMission, setLoadingMission] = useState(true);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [fs, setFs] = useState<FileSystemNode>(JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM)));
-  const [cwd, setCwd] = useState('/home/student');
+  const [fs, setFs] = useState<FileSystemNode>(() => {
+    // 初期化時にLocalStorageから読み込み
+    const savedFs = localStorage.getItem('lquest_fs');
+    return savedFs ? JSON.parse(savedFs) : JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM));
+  });
+  const [cwd, setCwd] = useState(() => {
+    return localStorage.getItem('lquest_cwd') || '/home/student';
+  });
   const [commandLog, setCommandLog] = useState<CommandHistory[]>([]);
   const [showHint, setShowHint] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [activeTab, setActiveTab] = useState<'guide' | 'files'>('guide');
   const [startTime, setStartTime] = useState<number>(Date.now());
+  
+  // Nano Editor State
+  const [showNano, setShowNano] = useState(false);
+  const [nanoFile, setNanoFile] = useState('');
+  const [nanoContent, setNanoContent] = useState('');
 
   // ミッションデータの取得
   useEffect(() => {
@@ -136,11 +168,36 @@ export const MissionRunner = () => {
     };
 
     loadMission();
+    loadMission();
   }, [id]);
+
+  // データ永続化: fs または cwd が変更されたら保存
+  useEffect(() => {
+    // デバウンス処理（頻繁な書き込み防止）
+    const timer = setTimeout(() => {
+      localStorage.setItem('lquest_fs', JSON.stringify(fs));
+      localStorage.setItem('lquest_cwd', cwd);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [fs, cwd]);
 
   const currentStep = mission?.steps[currentStepIndex];
 
   const handleCommand = (cmd: string, output: string) => {
+    // Nano起動チェック
+    if (output.startsWith('__NANO__')) {
+      const filename = output.replace('__NANO__', '');
+      setNanoFile(filename);
+      
+      // ファイル内容の読み込み
+      const node = resolvePath(fs, cwd, filename);
+      // 新規ファイルなら空、既存ならその内容
+      const content = node && node.type === 'file' ? node.content || '' : '';
+      setNanoContent(content);
+      setShowNano(true);
+      return;
+    }
+
     const newCommand: CommandHistory = {
       command: cmd,
       output,
@@ -165,7 +222,7 @@ export const MissionRunner = () => {
         currentStep.validationType,
         currentStep.validationParams
       );
-      isValid = validationFn(commandLog);
+      isValid = validationFn(commandLog, fs, cwd);
     }
 
     if (isValid) {
@@ -201,6 +258,15 @@ export const MissionRunner = () => {
     setShowHint(false);
     setCwd('/home/student');
     setStartTime(Date.now());
+    // LocalStorageもクリア
+    localStorage.removeItem('lquest_fs');
+    localStorage.removeItem('lquest_cwd');
+  };
+
+  const handleNanoSave = (content: string) => {
+    const newFs = writeFile(fs, cwd, nanoFile, content);
+    setFs(newFs);
+    setNanoContent(content); // Update local content
   };
 
   // カレントディレクトリのファイル一覧を取得
@@ -415,13 +481,23 @@ export const MissionRunner = () => {
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 flex gap-0 min-h-0">
             {/* Terminal */}
-            <div className="flex-1 border-r border-slate-700 overflow-hidden">
+            <div className="flex-1 border-r border-slate-700 overflow-hidden relative">
               <Terminal 
                 fs={fs}
                 setFs={setFs}
                 onCommand={handleCommand} 
                 onCwdChange={setCwd}
               />
+              {showNano && (
+                <div className="absolute inset-0 z-50">
+                  <NanoEditor 
+                    filename={nanoFile}
+                    initialContent={nanoContent}
+                    onSave={handleNanoSave}
+                    onClose={() => setShowNano(false)}
+                  />
+                </div>
+              )}
             </div>
 
             {/* GUI File Manager */}

@@ -450,34 +450,24 @@ export const executeCommand = (
       return output.trimEnd();
     }
 
-    case 'find':
-      const { params: findParams } = parseArgs(args);
-      const findPath = findParams[0] || '.';
-      const nameIdx = args.indexOf('-name');
-      const findName = nameIdx !== -1 ? args[nameIdx + 1] : '*';
-      
-      const findNode = resolvePath(fs, cwd, findPath);
-      if (!findNode) return `find: '${findPath}': No such file or directory`;
-      
-      const findResults: string[] = [];
-      const traverseFind = (node: FileSystemNode, currentPath: string) => {
-        // globパターンの簡易実装（*のみ対応）
-        const match = findName === '*' || 
-                      (findName.startsWith('*') && node.name.endsWith(findName.slice(1))) ||
-                      (findName.endsWith('*') && node.name.startsWith(findName.slice(0, -1))) ||
-                      node.name === findName;
+// ... (existing imports)
 
-        if (match) findResults.push(currentPath);
-        
-        if (node.children) {
-          Object.values(node.children).forEach(child => {
-            traverseFind(child, currentPath === '/' ? `/${child.name}` : `${currentPath}/${child.name}`);
-          });
-        }
-      };
-      
-      traverseFind(findNode, findPath === '.' ? cwd : (findPath.startsWith('/') ? findPath : normalizePath(cwd, findPath)));
-      return findResults.join('\n');
+
+// ... inside executeCommand switch ...
+
+    case 'nano': {
+      const fileName = args[0];
+      if (!fileName) return 'nano: missing filename';
+      // ファイルシステムチェック（ディレクトリかどうかだけ確認）
+      const node = resolvePath(fs, cwd, fileName);
+      if (node && node.type === 'directory') {
+        return `nano: ${fileName}: Is a directory`;
+      }
+      return `__NANO__${fileName}`;
+    }
+
+    case 'find':
+// ... (existing find logic)
 
     case 'head':
     case 'tail': {
@@ -802,4 +792,56 @@ Try 'man <command>' for more information.`;
     default:
       return `${cmd}: command not found`;
   }
+};
+
+// ファイル書き込みヘルパー（絶対パスまたはCWD相対パスに対応）
+export const writeFile = (
+  root: FileSystemNode,
+  cwd: string,
+  filePath: string,
+  content: string
+): FileSystemNode => {
+  const newFs = JSON.parse(JSON.stringify(root));
+  
+  // パスの解決
+  // 絶対パスか相対パスか判定
+  const isAbsolute = filePath.startsWith('/');
+  let targetPath = isAbsolute ? filePath : (cwd === '/' ? `/${filePath}` : `${cwd}/${filePath}`);
+  
+  // 正規化（..や.の解決）
+  const parts = targetPath.split('/').filter(p => p && p !== '.');
+  const normalizedParts: string[] = [];
+  for (const part of parts) {
+    if (part === '..') {
+      normalizedParts.pop();
+    } else {
+      normalizedParts.push(part);
+    }
+  }
+  
+  const fileName = normalizedParts.pop();
+  if (!fileName) return root; // ファイル名がない
+
+  // 親ディレクトリを探索
+  let current = newFs;
+  for (const part of normalizedParts) {
+    if (!current.children || !current.children[part]) {
+      // 親ディレクトリが存在しない場合はエラー（mkdir -p的な動作はしない）
+      // あるいは自動作成するかどうか。今回は自動作成しない（Linuxの挙動に合わせる）
+      return root; 
+    }
+    current = current.children[part];
+    if (current.type !== 'directory') return root; // 途中にファイルがある
+  }
+
+  // ファイル書き込み
+  if (!current.children) current.children = {};
+  current.children[fileName] = {
+    type: 'file',
+    name: fileName,
+    content: content,
+    permissions: 'rw-r--r--'
+  };
+
+  return newFs;
 };

@@ -227,6 +227,36 @@ export const Admin = () => {
             />
           </div>
         );
+      case 'file_content_match':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold mb-1 text-slate-400">対象ファイルパス</label>
+              <input
+                type="text"
+                value={step.validationParams.filePath || ''}
+                onChange={(e) => updateStep(index, 'validationParams', { 
+                  ...step.validationParams,
+                  filePath: e.target.value 
+                })}
+                className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+                placeholder="例: /home/student/hello.txt"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1 text-slate-400">期待するファイル内容</label>
+              <textarea
+                value={step.validationParams.fileContent || ''}
+                onChange={(e) => updateStep(index, 'validationParams', { 
+                  ...step.validationParams,
+                  fileContent: e.target.value 
+                })}
+                className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white h-24 font-mono"
+                placeholder="ファイルに含まれるべき正確な内容を入力してください"
+              />
+            </div>
+          </div>
+        );
       default:
         return null;
     }
@@ -480,6 +510,7 @@ export const Admin = () => {
                                   <option value="command_contains">コマンド部分一致</option>
                                   <option value="output_contains">出力に文字含む</option>
                                   <option value="file_exists">ファイル存在確認</option>
+                                  <option value="file_content_match">ファイル内容一致</option>
                                 </select>
                               </div>
                             </div>

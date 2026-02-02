@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { RotateCcw, Folder, File, Clock, FileText, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { FileSystemNode } from '../types';
-import { executeCommand, resolvePath } from '../utils/terminalLogic';
+import { executeCommand, resolvePath, writeFile } from '../utils/terminalLogic';
 import { INITIAL_FILE_SYSTEM } from '../constants';
+import { NanoEditor } from '../components/NanoEditor';
 
 interface CommandEntry {
   command: string;
@@ -71,16 +72,37 @@ const formatFileSize = (content: string | undefined): string => {
 export const Demo = () => {
   const [commands, setCommands] = useState<CommandEntry[]>([]);
   const [input, setInput] = useState('');
-  const [fs, setFs] = useState<FileSystemNode>(JSON.parse(JSON.stringify(DEMO_INITIAL_FS)));
-  const [cwd, setCwd] = useState('/home/guest');
+  const [fs, setFs] = useState<FileSystemNode>(() => {
+    // 初期化時にLocalStorageから読み込み
+    const savedFs = localStorage.getItem('lquest_demo_fs');
+    return savedFs ? JSON.parse(savedFs) : JSON.parse(JSON.stringify(DEMO_INITIAL_FS));
+  });
+  const [cwd, setCwd] = useState(() => {
+    return localStorage.getItem('lquest_demo_cwd') || '/home/guest';
+  });
   const [activeCategory, setActiveCategory] = useState<'basic' | 'practical' | 'general'>('basic');
   const terminalRef = useRef<HTMLDivElement>(null);
+  
+  // Nano Editor State
+  const [showNano, setShowNano] = useState(false);
+  const [nanoFile, setNanoFile] = useState('');
+  const [nanoContent, setNanoContent] = useState('');
 
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [commands]);
+
+  // データ永続化: fs または cwd が変更されたら保存
+  useEffect(() => {
+    // デバウンス処理（頻繁な書き込み防止）
+    const timer = setTimeout(() => {
+      localStorage.setItem('lquest_demo_fs', JSON.stringify(fs));
+      localStorage.setItem('lquest_demo_cwd', cwd);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [fs, cwd]);
 
   const handleCommand = (cmd: string, comment?: string) => {
     const trimmed = cmd.trim();
@@ -122,6 +144,20 @@ export const Demo = () => {
     const cmdArgs = args.slice(1);
 
     const output = executeCommand(cmdName, cmdArgs, fs, cwd, setFs, setCwd);
+    
+    // Nano起動チェック
+    if (output.startsWith('__NANO__')) {
+      const filename = output.replace('__NANO__', '');
+      setNanoFile(filename);
+      
+      // ファイル内容の読み込み
+      const node = resolvePath(fs, cwd, filename);
+      const content = node && node.type === 'file' ? node.content || '' : '';
+      setNanoContent(content);
+      setShowNano(true);
+      setInput('');
+      return;
+    }
 
     if (output !== '__CLEAR__') {
       setCommands(prev => [...prev, { 
@@ -134,11 +170,20 @@ export const Demo = () => {
     setInput('');
   };
 
+  const handleNanoSave = (content: string) => {
+    const newFs = writeFile(fs, cwd, nanoFile, content);
+    setFs(newFs);
+    setNanoContent(content); // Update local content
+  };
+
   const reset = () => {
     setCommands([]);
     setFs(JSON.parse(JSON.stringify(DEMO_INITIAL_FS)));
     setCwd('/home/guest');
     setInput('');
+    // LocalStorageもクリア
+    localStorage.removeItem('lquest_demo_fs');
+    localStorage.removeItem('lquest_demo_cwd');
   };
 
   // 現在のディレクトリのファイル一覧を取得
@@ -191,7 +236,7 @@ export const Demo = () => {
         {/* Main Demo Area */}
         <div className="grid lg:grid-cols-2 gap-6 items-stretch mb-8">
           {/* CLI Terminal */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[500px]">
+          <div className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[500px] relative">
             <div className="h-8 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -235,6 +280,17 @@ export const Demo = () => {
                 />
               </div>
             </div>
+            
+            {showNano && (
+              <div className="absolute inset-0 z-50">
+                <NanoEditor 
+                  filename={nanoFile}
+                  initialContent={nanoContent}
+                  onSave={handleNanoSave}
+                  onClose={() => setShowNano(false)}
+                />
+              </div>
+            )}
           </div>
 
           {/* GUI File Manager */}
