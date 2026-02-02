@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Terminal } from '../components/Terminal';
 import { NanoEditor } from '../components/NanoEditor';
 import { MISSIONS, INITIAL_FILE_SYSTEM } from '../constants';
@@ -92,7 +92,8 @@ interface MissionData {
 
 export const MissionRunner = () => {
   const { id } = useParams();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
   
   const [mission, setMission] = useState<MissionData | null>(null);
   const [loadingMission, setLoadingMission] = useState(true);
@@ -124,30 +125,41 @@ export const MissionRunner = () => {
       // まずデータベースからミッションを取得
       const { data: dbMission } = await db.getMissionWithSteps(id || '');
       
-      if (dbMission && dbMission.steps && dbMission.steps.length > 0) {
-        // データベースからのミッション（ステップあり）
-        const formattedSteps: MissionStep[] = dbMission.steps.map((step: any) => ({
-          id: step.id,
-          title: step.title,
-          instruction: step.instruction,
-          hint: step.hint,
-          validationType: step.validation_type as ValidationType,
-          validationParams: step.validation_params as ValidationParams,
-          validation: createValidationFunction(
-            step.validation_type as ValidationType,
-            step.validation_params as ValidationParams
-          ),
-        }));
+      if (dbMission) {
+        // ロックチェック: ロックされており、かつ管理者でない場合はアクセスを拒否
+        if (dbMission.is_locked && !isAdmin) {
+          setMission(null);
+          setLoadingMission(false);
+          alert('このミッションは現在ロックされています。');
+          navigate('/missions');
+          return;
+        }
 
-        setMission({
-          id: dbMission.id,
-          title: dbMission.title,
-          description: dbMission.description,
-          category: dbMission.category,
-          difficulty: dbMission.difficulty,
-          xp: dbMission.xp,
-          steps: formattedSteps,
-        });
+        if (dbMission.steps && dbMission.steps.length > 0) {
+          // データベースからのミッション（ステップあり）
+          const formattedSteps: MissionStep[] = dbMission.steps.map((step: any) => ({
+            id: step.id,
+            title: step.title,
+            instruction: step.instruction,
+            hint: step.hint,
+            validationType: step.validation_type as ValidationType,
+            validationParams: step.validation_params as ValidationParams,
+            validation: createValidationFunction(
+              step.validation_type as ValidationType,
+              step.validation_params as ValidationParams
+            ),
+          }));
+
+          setMission({
+            id: dbMission.id,
+            title: dbMission.title,
+            description: dbMission.description,
+            category: dbMission.category,
+            difficulty: dbMission.difficulty,
+            xp: dbMission.xp,
+            steps: formattedSteps,
+          });
+        }
       } else {
         // フォールバック: constants.tsのハードコードミッション
         const constantMission = MISSIONS.find(m => m.id === id);
@@ -167,7 +179,6 @@ export const MissionRunner = () => {
       setLoadingMission(false);
     };
 
-    loadMission();
     loadMission();
   }, [id]);
 

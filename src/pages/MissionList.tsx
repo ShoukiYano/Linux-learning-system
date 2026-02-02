@@ -9,7 +9,7 @@ import { useAuth } from '../lib/AuthContext';
 import { Mission } from '../types';
 
 export const MissionList = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [missions, setMissions] = useState<Mission[]>(MISSIONS);
   const [filteredMissions, setFilteredMissions] = useState<Mission[]>(MISSIONS);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -17,6 +17,15 @@ export const MissionList = () => {
   const [userMissions, setUserMissions] = useState<any[]>([]);
 
   useEffect(() => {
+    // Fetch missions from Supabase
+    const fetchMissions = async () => {
+      const { data, error } = await db.getMissions();
+      if (data && data.length > 0) {
+        setMissions(data);
+      }
+    };
+    fetchMissions();
+
     // Fetch user missions from Supabase if user is logged in
     if (user?.id) {
       fetchUserMissions();
@@ -101,11 +110,13 @@ export const MissionList = () => {
           {filteredMissions.map((mission) => {
             const userMission = userMissions.find(um => um.mission_id === mission.id);
             const isCompleted = userMission?.is_completed || mission.isCompleted;
+            // DBのis_lockedか、モックのisLockedを使用（管理者の場合は無視）
+            const isLocked = (mission.is_locked || mission.isLocked) && !isAdmin;
 
             return (
               <div key={mission.id} className={clsx(
                 "rounded-xl border p-6 flex flex-col h-full transition-all duration-300",
-                mission.isLocked 
+                isLocked 
                   ? "bg-slate-900/50 border-slate-800 opacity-75" 
                   : "bg-slate-800 border-slate-700 hover:border-primary-500/50 hover:shadow-lg hover:shadow-primary-500/10"
               )}>
@@ -120,7 +131,7 @@ export const MissionList = () => {
                     <div className="flex items-center gap-1 text-primary-500 text-xs font-bold">
                       <CheckCircle size={14} /> 完了
                     </div>
-                  ) : mission.isLocked ? (
+                  ) : isLocked ? (
                     <div className="flex items-center gap-1 text-slate-500 text-xs font-bold">
                       <Lock size={14} /> ロック
                     </div>
@@ -142,7 +153,7 @@ export const MissionList = () => {
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-yellow-400">+{mission.xp} XP</span>
                     </div>
-                    {mission.isLocked ? (
+                    {isLocked ? (
                       <span className="text-xs text-slate-500 flex items-center gap-1"><Lock size={12}/> Lv.3 Required</span>
                     ) : (
                       <Link 

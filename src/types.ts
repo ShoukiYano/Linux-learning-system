@@ -13,11 +13,12 @@ export interface Mission {
   id: string;
   title: string;
   description: string;
-  category: 'File Ops' | 'Permissions' | 'Network' | 'Text Processing';
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  category: string;
+  difficulty: string;
   xp: number;
-  isLocked: boolean;
-  isCompleted: boolean;
+  isLocked?: boolean;
+  is_locked?: boolean;
+  isCompleted?: boolean;
   steps: MissionStep[];
 }
 
