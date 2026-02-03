@@ -1,30 +1,44 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../lib/AuthContext';
+import { auth } from '../lib/supabase';
 import { Terminal } from 'lucide-react';
 
 export const AuthCallback = () => {
   const navigate = useNavigate();
-  const { user, loading, session } = useAuth();
 
   useEffect(() => {
-    // Wait for auth state to be processed
-    if (!loading) {
-      if (session && user) {
-        // OAuthログイン成功時にユーザーがまだDBに存在しない場合は作成
-        navigate('/dashboard');
-      } else if (session) {
-        // セッションはあるがユーザープロファイルがない場合は作成待ち
-        const timer = setTimeout(() => {
-          navigate('/dashboard');
-        }, 1000);
-        return () => clearTimeout(timer);
-      } else {
-        // ログイン失敗
-        navigate('/login', { replace: true });
+    console.log('AuthCallback mounted. Current URL:', window.location.href);
+    console.log('Search params:', window.location.search);
+    // console.log('Hash params:', window.location.hash);
+
+    // onAuthStateChange を使って、セッションが確立された瞬間をキャッチする
+    const { subscription } = auth.onAuthStateChange((event, session) => {
+      console.log('AuthCallback Event:', event, session ? 'Session found' : 'No session');
+      
+      if (session) {
+        // セッションが確立されたらダッシュボードへ
+        navigate('/dashboard', { replace: true });
       }
-    }
-  }, [loading, session, user, navigate]);
+    });
+
+    // 初期チェック（マウント時にすでにセッションがある場合用）
+    auth.getSession().then(({ data }) => {
+      if (data.session) {
+        navigate('/dashboard', { replace: true });
+      } else {
+        // 5秒待ってもセッションが来ない場合は、タイムアウトとしてログイン画面へ
+        const timeout = setTimeout(() => {
+          console.log('AuthCallback: Timeout reached, returning to login');
+          navigate('/login', { replace: true });
+        }, 5000);
+        return () => clearTimeout(timeout);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center">

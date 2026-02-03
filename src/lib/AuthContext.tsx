@@ -58,36 +58,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('users')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code === 'PGRST116') {
-        // ユーザープロファイルが存在しない場合は作成
-        const authUser = await auth.getSession();
-        if (authUser.data?.session?.user) {
-          const user = authUser.data.session.user;
-          const { error: insertError } = await supabase.from('users').insert({
-            id: user.id,
-            email: user.email || '',
-            name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+      if (!data && !error) {
+        // ユーザープロファイルが存在しない場合は作成を試みる（またはトリガーによる作成を少し待つ）
+        console.log('Profile not found, attempting to create or wait...');
+        const authUserResponse = await auth.getSession();
+        const authUser = authUserResponse.data?.session?.user;
+        
+        if (authUser) {
+          // すでにある場合は何もしない upsert 的な挙動
+          const { error: insertError } = await supabase.from('users').upsert({
+            id: authUser.id,
+            email: authUser.email || '',
+            name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User',
             level: 1,
             xp: 0,
             streak: 0,
             role: 'user',
-          });
+          }, { onConflict: 'id' });
 
           if (!insertError) {
-            // 新規作成後に再度取得
             const { data: newData } = await supabase
               .from('users')
               .select('*')
               .eq('id', userId)
-              .single();
-            if (newData) {
-              setUser(newData);
-            }
+              .maybeSingle();
+            if (newData) setUser(newData);
           }
         }
-      } else if (!error && data) {
+      } else if (data) {
         setUser(data);
       }
     } catch (error) {

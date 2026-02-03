@@ -6,7 +6,7 @@ import { useAuth } from '../lib/AuthContext';
 export const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, signInWithGoogle } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,6 +16,12 @@ export const Login = () => {
   const [error, setError] = useState('');
 
   const isRegister = location.pathname === '/register';
+
+  React.useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/dashboard');
+    }
+  }, [user, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,7 +186,7 @@ export const Login = () => {
               ) : (
                 <span className="font-bold text-blue-500">G</span>
               )}
-              Google でログイン
+              Google で{isRegister ? '新規登録' : 'ログイン'}
             </button>
           </div>
 
