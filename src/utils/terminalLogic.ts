@@ -89,6 +89,9 @@ export interface CommandResult {
   newFs?: FileSystemNode;
   newCwd?: string;
   stdinContent?: string;
+  isAsync?: boolean;
+  asyncType?: 'zip' | 'unzip';
+  asyncTargets?: string[];
 }
 
 // Helper to separate options from arguments
@@ -631,8 +634,54 @@ export const executeCommand = (
       }
     }
 
-    case 'find':
-// ... (existing find logic)
+    case 'find': {
+      let startPath = '.';
+      let namePattern: string | null = null;
+      
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === '-name') {
+          namePattern = args[i + 1];
+          // Remove quotes if present
+          if (namePattern && ((namePattern.startsWith('"') && namePattern.endsWith('"')) || (namePattern.startsWith("'") && namePattern.endsWith("'")))) {
+            namePattern = namePattern.slice(1, -1);
+          }
+          i++;
+        } else if (!args[i].startsWith('-')) {
+          startPath = args[i];
+        }
+      }
+
+      const startNode = resolvePath(fs, cwd, startPath);
+      if (!startNode) return { output: `find: '${startPath}': No such file or directory` };
+
+      const results: string[] = [];
+      const traverse = (node: FileSystemNode, currentPath: string) => {
+        let isMatch = true;
+        if (namePattern) {
+          // simple glob to regex: *.txt -> ^.*\.txt$
+          const regexPattern = namePattern
+            .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex chars
+            .replace(/\*/g, '.*')
+            .replace(/\?/g, '.');
+          const regex = new RegExp(`^${regexPattern}$`);
+          isMatch = regex.test(node.name);
+        }
+
+        if (isMatch) {
+          results.push(currentPath);
+        }
+
+        if (node.type === 'directory' && node.children) {
+          Object.keys(node.children).sort().forEach(name => {
+            const childPath = currentPath === '/' ? `/${name}` : (currentPath.endsWith('/') ? `${currentPath}${name}` : `${currentPath}/${name}`);
+            traverse(node.children![name], childPath);
+          });
+        }
+      };
+
+      traverse(startNode, startPath);
+      return { output: results.join('\n') };
+    }
 
     case 'head':
     case 'tail': {
@@ -787,6 +836,108 @@ export const executeCommand = (
     }
 
     // --- 新規追加コマンド ---
+
+    case 'zip': {
+      const { options: zipOptionsRaw, params: zipParams } = parseArgs(args);
+      const opts = parseOptions(zipOptionsRaw);
+      
+      if (zipParams.length < 2) return { output: 'zip error: Nothing to do!' };
+      
+      const zipName = zipParams[0].endsWith('.zip') ? zipParams[0] : zipParams[0] + '.zip';
+      const targets = zipParams.slice(1);
+      const newFs = JSON.parse(JSON.stringify(fs));
+      
+      const archiveData: Record<string, FileSystemNode> = {};
+      let outStr = '';
+
+      for (const target of targets) {
+        const node = resolvePath(fs, cwd, target);
+        if (!node) {
+          outStr += `zip warning: name not matched: ${target}\n`;
+          continue;
+        }
+
+        if (node.type === 'directory' && !opts.has('r')) {
+          outStr += `zip warning: skipping directory: ${target}\n`;
+          continue;
+        }
+
+        // Add to archive (simulated: store node structure)
+        archiveData[target] = JSON.parse(JSON.stringify(node));
+        
+        if (node.type === 'directory') {
+          outStr += `  adding: ${target}/ (stored 0%)\n`;
+        } else {
+          outStr += `  adding: ${target} (deflated 10%)\n`;
+        }
+      }
+
+      if (Object.keys(archiveData).length === 0) {
+        return { output: outStr + 'zip error: Nothing to do!' };
+      }
+
+      // Create the zip file
+      const parts = normalizePath(cwd, zipName).split('/');
+      const fileName = parts.pop()!;
+      const dirPath = parts.join('/') || '/';
+      const dirNode = resolvePath(newFs, '/', dirPath);
+      
+      if (dirNode && dirNode.children) {
+        dirNode.children[fileName] = {
+          name: fileName,
+          type: 'file',
+          permissions: '-rw-r--r--',
+          content: `__ZIP_DATA__${JSON.stringify(archiveData)}`
+        };
+        return { 
+          output: outStr.trim(), 
+          newFs, 
+          isAsync: true, 
+          asyncType: 'zip', 
+          asyncTargets: Object.keys(archiveData) 
+        };
+      }
+      return { output: `zip error: could not create ${zipName}` };
+    }
+
+    case 'unzip': {
+      const { params: unzipParams } = parseArgs(args);
+      if (unzipParams.length === 0) return { output: 'unzip:  must specify archive to extract' };
+      
+      const zipName = unzipParams[0];
+      const node = resolvePath(fs, cwd, zipName);
+      
+      if (!node || node.type !== 'file' || !node.content?.startsWith('__ZIP_DATA__')) {
+        return { output: `unzip:  cannot find or open ${zipName}, ${zipName}.zip or ${zipName}.ZIP.` };
+      }
+
+      try {
+        const rawData = node.content.replace('__ZIP_DATA__', '');
+        const archiveData: Record<string, FileSystemNode> = JSON.parse(rawData);
+        const newFs = JSON.parse(JSON.stringify(fs));
+        const currentDirNode = resolvePath(newFs, cwd, '.');
+        
+        if (!currentDirNode || !currentDirNode.children) return { output: 'unzip error: destination is invalid' };
+
+        let outStr = `Archive:  ${zipName}\n`;
+        const targets: string[] = [];
+        for (const [name, archivedNode] of Object.entries(archiveData)) {
+          currentDirNode.children[name] = archivedNode;
+          outStr += `  inflating: ${name}\n`;
+          targets.push(name);
+        }
+        
+        return { 
+          output: outStr.trim(), 
+          newFs,
+          isAsync: true,
+          asyncType: 'unzip',
+          asyncTargets: targets
+        };
+      } catch (e) {
+        return { output: 'unzip error: invalid archive format' };
+      }
+    }
 
     case 'sort': {
       const { options: sortOptionsRaw, params: sortParams } = parseArgs(args);
@@ -1119,11 +1270,11 @@ export const executeCommandLine = (
 
     if (result.newFs) {
         currentFs = result.newFs;
-        onFsChange(currentFs);
+        if (!result.isAsync) onFsChange(currentFs);
     }
     if (result.newCwd) {
         currentCwd = result.newCwd;
-        onCwdChange(currentCwd);
+        if (!result.isAsync) onCwdChange(currentCwd);
     }
 
     lastOutput = result.output;

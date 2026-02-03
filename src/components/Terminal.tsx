@@ -29,6 +29,7 @@ export const Terminal: React.FC<TerminalProps> = ({
   ]);
   const [cwd, setCwdLocal] = useState('/home/student');
   const [input, setInput] = useState('');
+  const [isExecuting, setIsExecuting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +135,8 @@ export const Terminal: React.FC<TerminalProps> = ({
     }
 
     if (e.key === 'Enter') {
+      if (isExecuting) return;
+
       const cmdTrimmed = input.trim();
       if (!cmdTrimmed) {
         setHistory(prev => [...prev, { command: '', output: '', timestamp: Date.now(), status: 'success', cwd }]);
@@ -165,15 +168,56 @@ export const Terminal: React.FC<TerminalProps> = ({
       
       const newEntry: CommandHistory = {
         command: cmdTrimmed,
-        output,
+        output: result.isAsync ? 'Starting...' : output,
         timestamp: Date.now(),
         status: (output.includes('error') || output.includes('cannot') || output.includes('No such') || output.includes('command not found')) ? 'error' : 'success',
         cwd
       };
 
       setHistory(prev => [...prev, newEntry]);
+      const entryId = history.length + 1; // Approximate ID for updating
+
+      if (result.isAsync) {
+        setIsExecuting(true);
+        const startTime = Date.now();
+        const duration = 5000; // 5 seconds
+        const typeStr = result.asyncType === 'zip' ? 'adding' : 'inflating';
+        const actionStr = result.asyncType === 'zip' ? 'deflated' : 'extracted';
+
+        const timer = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(Math.round((elapsed / duration) * 100), 100);
+          
+          let simulatedOutput = result.asyncType === 'unzip' ? `Archive:  ${cmdTrimmed.split(' ')[1]}\n` : '';
+          result.asyncTargets?.forEach(target => {
+            simulatedOutput += `  ${typeStr}: ${target}${result.asyncType === 'zip' && target.endsWith('/') ? '/' : ''} (${actionStr} ${progress}%)\n`;
+          });
+
+          setHistory(prev => {
+            const updated = [...prev];
+            if (updated[updated.length - 1]) {
+              updated[updated.length - 1].output = simulatedOutput.trim();
+            }
+            return updated;
+          });
+
+          if (progress >= 100) {
+            clearInterval(timer);
+            setIsExecuting(false);
+            if (onCommand) onCommand(cmdTrimmed, simulatedOutput.trim(), result);
+            
+            // Apply changes to FS and CWD after operation completes
+            if (result.newFs) setFs(result.newFs);
+            if (result.newCwd) setCwd(result.newCwd);
+            
+            // Re-focus input after a tick
+            setTimeout(() => inputRef.current?.focus(), 10);
+          }
+        }, 100);
+      } else {
+        if (onCommand) onCommand(cmdTrimmed, output, result);
+      }
       setInput('');
-      if (onCommand) onCommand(cmdTrimmed, output, result);
     }
   };
 
@@ -211,7 +255,11 @@ export const Terminal: React.FC<TerminalProps> = ({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="bg-transparent border-none outline-none text-slate-100 flex-1 caret-primary-500"
+          disabled={isExecuting}
+          className={clsx(
+            "bg-transparent border-none outline-none text-slate-100 flex-1 caret-primary-500",
+            isExecuting && "opacity-50 cursor-not-allowed"
+          )}
           autoFocus
           autoComplete="off"
           spellCheck="false"

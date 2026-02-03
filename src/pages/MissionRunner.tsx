@@ -4,7 +4,7 @@ import { Terminal } from '../components/Terminal';
 import { NanoEditor } from '../components/NanoEditor';
 import { MISSIONS, INITIAL_FILE_SYSTEM } from '../constants';
 import { FileSystemNode, CommandHistory, MissionStep, ValidationType, ValidationParams } from '../types';
-import { ChevronLeft, Play, CheckCircle, HelpCircle, RotateCcw, FolderTree, BookOpen, Zap, Folder, File, Loader2 } from 'lucide-react';
+import { ChevronLeft, Play, CheckCircle, HelpCircle, RotateCcw, FolderTree, BookOpen, Zap, Folder, File, Loader2, FileArchive } from 'lucide-react';
 import { clsx } from 'clsx';
 import { db } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
@@ -69,8 +69,14 @@ const renderFileTree = (node: FileSystemNode, path: string, depth: number = 0): 
     result.push(
       <div key={fullPath} className="text-xs">
         <div className="flex items-center gap-1 py-1 px-2 rounded hover:bg-slate-700/50 transition-colors" style={{ marginLeft: `${depth * 12}px` }}>
-          {isDir ? <Folder size={14} className="text-blue-400" /> : <File size={14} className="text-slate-300" />}
-          <span className={isDir ? "text-blue-300 font-bold" : "text-slate-200"}>{name}{isDir ? '/' : ''}</span>
+          {isDir ? (
+            <Folder size={14} className="text-blue-400" />
+          ) : name.endsWith('.zip') ? (
+            <FileArchive size={14} className="text-yellow-500" />
+          ) : (
+            <File size={14} className="text-slate-300" />
+          )}
+          <span className={isDir ? "text-blue-300 font-bold" : name.endsWith('.zip') ? "text-yellow-200" : "text-slate-200"}>{name}{isDir ? '/' : ''}</span>
         </div>
         {isDir && renderFileTree(child, fullPath, depth + 1)}
       </div>
@@ -554,10 +560,12 @@ export const MissionRunner = () => {
                           <div className="flex items-center gap-2">
                             {file.type === 'directory' ? (
                               <Folder size={16} className="text-yellow-400" />
+                            ) : file.name.endsWith('.zip') ? (
+                              <FileArchive size={16} className="text-yellow-500" />
                             ) : (
                               <File size={16} className="text-slate-400" />
                             )}
-                            <span className={file.type === 'directory' ? 'text-blue-300 font-bold' : 'text-slate-200'}>
+                            <span className={file.type === 'directory' ? 'text-blue-300 font-bold' : file.name.endsWith('.zip') ? 'text-yellow-200 font-semibold' : 'text-slate-200'}>
                               {file.name}
                             </span>
                           </div>

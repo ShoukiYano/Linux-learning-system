@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { RotateCcw, Folder, File, Clock, FileText, ChevronRight } from 'lucide-react';
+import { RotateCcw, Folder, File, Clock, FileText, ChevronRight, FileArchive } from 'lucide-react';
 import { clsx } from 'clsx';
 import { FileSystemNode } from '../types';
 import { executeCommandLine, resolvePath, writeFile, CommandResult } from '../utils/terminalLogic';
@@ -59,7 +59,10 @@ const SAMPLE_COMMANDS = [
   { cmd: 'ps', desc: '実行中のプロセスを表示', category: 'general' },
   { cmd: 'date', desc: '現在の日時を表示', category: 'general' },
   { cmd: 'whoami', desc: '現在のユーザーを表示', category: 'general' },
+  { cmd: 'whoami', desc: '現在のユーザーを表示', category: 'general' },
   { cmd: 'history', desc: 'コマンド履歴を表示', category: 'general' },
+  { cmd: 'zip -r backup.zip project', desc: 'ディレクトリを圧縮', category: 'general' },
+  { cmd: 'unzip backup.zip', desc: 'アーカイブを展開', category: 'general' },
 ];
 
 // ファイルサイズをフォーマット
@@ -81,7 +84,9 @@ export const Demo = () => {
     return localStorage.getItem('lquest_demo_cwd') || '/home/guest';
   });
   const [activeCategory, setActiveCategory] = useState<'basic' | 'practical' | 'general'>('basic');
+  const [isExecuting, setIsExecuting] = useState(false);
   const terminalRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Nano Editor State
   const [showNano, setShowNano] = useState(false);
@@ -105,6 +110,7 @@ export const Demo = () => {
   }, [fs, cwd]);
 
   const handleCommand = (cmd: string, comment?: string) => {
+    if (isExecuting) return;
     const trimmed = cmd.trim();
     if (!trimmed) return;
 
@@ -147,12 +153,50 @@ export const Demo = () => {
     }
 
     if (output !== '__CLEAR__') {
-      setCommands(prev => [...prev, { 
+      const newEntry = { 
         command: trimmed, 
-        output, 
+        output: result.isAsync ? 'Starting...' : output, 
         time: timestamp,
         comment 
-      }]);
+      };
+      setCommands(prev => [...prev, newEntry]);
+
+      if (result.isAsync) {
+        setIsExecuting(true);
+        const startTime = Date.now();
+        const duration = 5000;
+        const typeStr = result.asyncType === 'zip' ? 'adding' : 'inflating';
+        const actionStr = result.asyncType === 'zip' ? 'deflated' : 'extracted';
+
+        const timer = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(Math.round((elapsed / duration) * 100), 100);
+          
+          let simulatedOutput = result.asyncType === 'unzip' ? `Archive:  ${trimmed.split(' ')[1]}\n` : '';
+          result.asyncTargets?.forEach(target => {
+            simulatedOutput += `  ${typeStr}: ${target}${result.asyncType === 'zip' && target.endsWith('/') ? '/' : ''} (${actionStr} ${progress}%)\n`;
+          });
+
+          setCommands(prev => {
+            const updated = [...prev];
+            if (updated[updated.length - 1]) {
+              updated[updated.length - 1].output = simulatedOutput.trim();
+            }
+            return updated;
+          });
+
+          if (progress >= 100) {
+            clearInterval(timer);
+            setIsExecuting(false);
+            
+            // Apply changes to FS and CWD after operation completes
+            if (result.newFs) setFs(result.newFs);
+            if (result.newCwd) setCwd(result.newCwd);
+            
+            setTimeout(() => inputRef.current?.focus(), 10);
+          }
+        }, 100);
+      }
     }
     setInput('');
   };
@@ -253,6 +297,7 @@ export const Demo = () => {
               <div className="flex gap-2 items-center">
                 <span className="text-primary-500 font-bold">guest@l-quest:~$</span>
                 <input
+                  ref={inputRef}
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -261,9 +306,15 @@ export const Demo = () => {
                       handleCommand(input);
                     }
                   }}
-                  className="flex-1 bg-transparent outline-none text-white placeholder-slate-600"
-                  placeholder="コマンドを入力..."
+                  disabled={isExecuting}
+                  className={clsx(
+                    "flex-1 bg-transparent outline-none text-white placeholder-slate-600",
+                    isExecuting && "opacity-50 cursor-not-allowed"
+                  )}
+                  placeholder={isExecuting ? "処理中..." : "コマンドを入力..."}
                   autoFocus
+                  spellCheck="false"
+                  autoComplete="off"
                 />
               </div>
             </div>
@@ -316,10 +367,12 @@ export const Demo = () => {
                           <div className="flex items-center gap-2">
                             {file.type === 'directory' ? (
                               <Folder size={16} className="text-yellow-400" />
+                            ) : file.name.endsWith('.zip') ? (
+                              <FileArchive size={16} className="text-yellow-500" />
                             ) : (
                               <FileText size={16} className="text-slate-400" />
                             )}
-                            <span className={file.type === 'directory' ? 'text-blue-300 font-bold' : 'text-slate-200'}>
+                            <span className={file.type === 'directory' ? 'text-blue-300 font-bold' : file.name.endsWith('.zip') ? 'text-yellow-200 font-semibold' : 'text-slate-200'}>
                               {file.name}
                             </span>
                           </div>
