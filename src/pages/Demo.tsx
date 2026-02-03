@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { RotateCcw, Folder, File, Clock, FileText, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { FileSystemNode } from '../types';
-import { executeCommand, resolvePath, writeFile } from '../utils/terminalLogic';
+import { executeCommandLine, resolvePath, writeFile, CommandResult } from '../utils/terminalLogic';
 import { INITIAL_FILE_SYSTEM } from '../constants';
 import { NanoEditor } from '../components/NanoEditor';
 
@@ -116,43 +116,30 @@ export const Demo = () => {
       return;
     }
 
-    // Parse command
-    const parseCmd = (str: string) => {
-      const args: string[] = [];
-      let current = '';
-      let inQuotes = false;
-      
-      for (let i = 0; i < str.length; i++) {
-        const char = str[i];
-        if (char === '"' || char === "'") {
-          inQuotes = !inQuotes;
-        } else if (char === ' ' && !inQuotes) {
-          if (current) {
-            args.push(current);
-            current = '';
-          }
-        } else {
-          current += char;
-        }
-      }
-      if (current) args.push(current);
-      return args;
-    };
-
-    const args = parseCmd(trimmed);
-    const cmdName = args[0];
-    const cmdArgs = args.slice(1);
-
-    const output = executeCommand(cmdName, cmdArgs, fs, cwd, setFs, setCwd);
+    const result = executeCommandLine(
+      trimmed,
+      fs,
+      cwd,
+      (newFs: FileSystemNode) => setFs(newFs),
+      (newCwd: string) => setCwd(newCwd)
+    );
     
+    const output = result.output;
+
     // Nano起動チェック
     if (output.startsWith('__NANO__')) {
       const filename = output.replace('__NANO__', '');
       setNanoFile(filename);
       
-      // ファイル内容の読み込み
-      const node = resolvePath(fs, cwd, filename);
-      const content = node && node.type === 'file' ? node.content || '' : '';
+      let content = '';
+      if (result.stdinContent !== undefined) {
+          content = result.stdinContent;
+      } else {
+          // ファイル内容の読み込み
+          const node = resolvePath(fs, cwd, filename);
+          // 新規ファイルなら空、既存ならその内容
+          content = node && node.type === 'file' ? node.content || '' : '';
+      }
       setNanoContent(content);
       setShowNano(true);
       setInput('');

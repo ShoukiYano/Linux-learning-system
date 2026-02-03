@@ -13,6 +13,8 @@ interface CommandData {
   example: string;
   category: string;
   difficulty: string;
+  options?: string;
+  tags?: string | string[];
 }
 
 export const AdminCommandEditor = () => {
@@ -26,6 +28,8 @@ export const AdminCommandEditor = () => {
     example: '',
     category: 'File Ops',
     difficulty: 'Easy',
+    options: '',
+    tags: '',
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -49,10 +53,23 @@ export const AdminCommandEditor = () => {
     setLoading(true);
 
     try {
+      const dataToSave = {
+        name: formData.name,
+        description: formData.description,
+        usage: formData.usage,
+        example: formData.example,
+        category: formData.category,
+        difficulty: formData.difficulty,
+        options: formData.options,
+        tags: typeof formData.tags === 'string' 
+          ? formData.tags.split(',').map(t => t.trim()).filter(t => t !== '')
+          : formData.tags
+      };
+
       if (editingId) {
-        await db.updateCommand(editingId, formData);
+        await db.updateCommand(editingId, dataToSave);
       } else {
-        await db.createCommand(formData);
+        await db.createCommand(dataToSave);
       }
       
       resetForm();
@@ -65,7 +82,16 @@ export const AdminCommandEditor = () => {
   };
 
   const handleEdit = (command: any) => {
-    setFormData(command);
+    setFormData({
+      name: command.name || '',
+      description: command.description || '',
+      usage: command.usage || '',
+      example: command.example || '',
+      category: command.category || 'File Ops',
+      difficulty: command.difficulty || 'Easy',
+      options: command.options || '',
+      tags: Array.isArray(command.tags) ? command.tags.join(', ') : (command.tags || '')
+    });
     setEditingId(command.id);
     setShowForm(true);
   };
@@ -85,6 +111,8 @@ export const AdminCommandEditor = () => {
       example: '',
       category: 'File Ops',
       difficulty: 'Easy',
+      options: '',
+      tags: '',
     });
     setEditingId(null);
     setShowForm(false);
@@ -192,6 +220,27 @@ export const AdminCommandEditor = () => {
                   onChange={(e) => setFormData({ ...formData, example: e.target.value })}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500 font-mono"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-2">利用可能なオプション (例: -l: 詳細表示, -a: 全表示)</label>
+                <textarea
+                  value={formData.options}
+                  onChange={(e) => setFormData({ ...formData, options: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500 h-24"
+                  placeholder="-l: 詳細情報を表示&#10;-a: 隠しファイルを含めて表示"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold mb-2">タグ (カンマ区切り)</label>
+                <input
+                  type="text"
+                  value={typeof formData.tags === 'string' ? formData.tags : ''}
+                  onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                  placeholder="basic, file, search"
                 />
               </div>
 

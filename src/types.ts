@@ -68,4 +68,5 @@ export interface CommandDoc {
   usage: string;
   category: string;
   tags: string[];
+  options?: string;
 }

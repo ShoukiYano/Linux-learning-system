@@ -8,7 +8,7 @@ import { ChevronLeft, Play, CheckCircle, HelpCircle, RotateCcw, FolderTree, Book
 import { clsx } from 'clsx';
 import { db } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
-import { executeCommand, resolvePath, writeFile } from '../utils/terminalLogic';
+import { resolvePath, writeFile, CommandResult, executeCommandLine } from '../utils/terminalLogic';
 
 // 検証関数を生成するヘルパー
 const createValidationFunction = (
@@ -194,16 +194,21 @@ export const MissionRunner = () => {
 
   const currentStep = mission?.steps[currentStepIndex];
 
-  const handleCommand = (cmd: string, output: string) => {
+  const handleCommand = (cmd: string, output: string, result: CommandResult) => {
     // Nano起動チェック
     if (output.startsWith('__NANO__')) {
       const filename = output.replace('__NANO__', '');
       setNanoFile(filename);
       
-      // ファイル内容の読み込み
-      const node = resolvePath(fs, cwd, filename);
-      // 新規ファイルなら空、既存ならその内容
-      const content = node && node.type === 'file' ? node.content || '' : '';
+      let content = '';
+      if (result.stdinContent !== undefined) {
+          content = result.stdinContent;
+      } else {
+          // ファイル内容の読み込み
+          const node = resolvePath(fs, cwd, filename);
+          // 新規ファイルなら空、既存ならその内容
+          content = node && node.type === 'file' ? node.content || '' : '';
+      }
       setNanoContent(content);
       setShowNano(true);
       return;

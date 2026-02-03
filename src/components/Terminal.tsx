@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CommandHistory, FileSystemNode } from '../types';
-import { executeCommand, resolvePath } from '../utils/terminalLogic';
+import { executeCommandLine, resolvePath, CommandResult } from '../utils/terminalLogic';
 import { INITIAL_FILE_SYSTEM } from '../constants';
 import { clsx } from 'clsx';
 import { ErrorTranslator } from './ErrorTranslator';
@@ -8,7 +8,7 @@ import { ErrorTranslator } from './ErrorTranslator';
 interface TerminalProps {
   fs?: FileSystemNode;
   setFs?: (fs: FileSystemNode) => void;
-  onCommand?: (cmd: string, output: string) => void;
+  onCommand?: (cmd: string, output: string, result: CommandResult) => void;
   onFsChange?: (fs: FileSystemNode) => void;
   onCwdChange?: (cwd: string) => void;
   fileSystem?: FileSystemNode;
@@ -146,42 +146,17 @@ export const Terminal: React.FC<TerminalProps> = ({
         setInput('');
         return;
       }
-
-      // Parse command with quote support
-      const parseCommand = (str: string) => {
-        const args: string[] = [];
-        let current = '';
-        let inQuotes = false;
-        
-        for (let i = 0; i < str.length; i++) {
-          const char = str[i];
-          
-          if (char === '"' || char === "'") {
-            inQuotes = !inQuotes;
-          } else if (char === ' ' && !inQuotes) {
-            if (current) {
-              args.push(current);
-              current = '';
-            }
-          } else {
-            current += char;
-          }
-        }
-        
-        if (current) {
-          args.push(current);
-        }
-        
-        return args;
-      };
       
-      const args = parseCommand(cmdTrimmed);
-      const cmd = args[0];
-      const cmdArgs = args.slice(1);
+      const result = executeCommandLine(
+        cmdTrimmed,
+        fs,
+        cwd,
+        (newFs: FileSystemNode) => setFs(newFs),
+        (newCwd: string) => setCwd(newCwd)
+      );
       
-      const output = executeCommand(cmd, cmdArgs, fs, cwd, setFs, setCwd);
+      const output = result.output;
       
-      // Handle clear command output
       if (output === '__CLEAR__') {
         setHistory([]);
         setInput('');
@@ -192,13 +167,13 @@ export const Terminal: React.FC<TerminalProps> = ({
         command: cmdTrimmed,
         output,
         timestamp: Date.now(),
-        status: output.includes('error') || output.includes('cannot') ? 'error' : 'success',
+        status: (output.includes('error') || output.includes('cannot') || output.includes('No such') || output.includes('command not found')) ? 'error' : 'success',
         cwd
       };
 
       setHistory(prev => [...prev, newEntry]);
       setInput('');
-      if (onCommand) onCommand(cmdTrimmed, output);
+      if (onCommand) onCommand(cmdTrimmed, output, result);
     }
   };
 
