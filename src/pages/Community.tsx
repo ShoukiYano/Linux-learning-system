@@ -213,7 +213,7 @@ export const Community = () => {
                 <div>
                   <h3 className="text-lg font-bold mb-1">{post.title}</h3>
                   <p className="text-sm text-slate-400">
-                    投稿者: {post.users?.name || post.created_by} • {new Date(post.created_at).toLocaleDateString('ja-JP')}
+                    投稿者: {post.created_by} • {new Date(post.created_at).toLocaleDateString('ja-JP')}
                   </p>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-sm font-bold ${
@@ -275,7 +275,7 @@ export const Community = () => {
                         <div key={answer.id} className="bg-slate-900/50 rounded-lg p-4">
                           <div className="flex items-start justify-between mb-2">
                             <div>
-                              <span className="text-sm font-bold text-primary-400">{answer.users?.name || answer.created_by}</span>
+                              <span className="text-sm font-bold text-primary-400">{answer.created_by}</span>
                               {answer.is_accepted && <span className="ml-2 text-xs font-bold text-green-400">✓ ベストアンサー</span>}
                             </div>
                             <button 

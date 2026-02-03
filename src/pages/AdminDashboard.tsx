@@ -103,6 +103,7 @@ export const AdminDashboard = () => {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
             { label: 'ミッション', icon: BookOpen, path: '/admin/missions' },
+            { label: 'ユーザー', icon: Users, path: '/admin/users' },
             { label: 'コマンド', icon: FileText, path: '/admin/commands' },
             { label: '学習パス', icon: TrendingUp, path: '/admin/learning-paths' },
             { label: 'ヘルプ', icon: HelpCircle, path: '/admin/help' },

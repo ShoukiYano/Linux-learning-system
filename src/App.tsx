@@ -18,8 +18,11 @@ import { AdminLearningPathEditor } from './pages/AdminLearningPathEditor';
 import { AdminHelpEditor } from './pages/AdminHelpEditor';
 import { AdminQAManager } from './pages/AdminQAManager';
 import { AdminMaintenance } from './pages/AdminMaintenance';
+import { AdminUserManagement } from './pages/AdminUserManagement';
 import { HelpCenter } from './pages/HelpCenter';
 import { Community } from './pages/Community';
+import { Curriculum } from './pages/Curriculum';
+import { LearningPathDetail } from './pages/LearningPathDetail';
 
 const App = () => {
   return (
@@ -38,10 +41,13 @@ const App = () => {
           <Route path="/missions/:id" element={<MissionRunner />} />
           <Route path="/dictionary" element={<Dictionary />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/curriculum" element={<Curriculum />} />
+          <Route path="/curriculum/:id" element={<LearningPathDetail />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<AdminUserManagement />} />
           <Route path="/admin/missions" element={<Admin />} />
           <Route path="/admin/commands" element={<AdminCommandEditor />} />
           <Route path="/admin/learning-paths" element={<AdminLearningPathEditor />} />

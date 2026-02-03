@@ -78,6 +78,22 @@ export const db = {
     return { data, error };
   },
 
+  async getUsers() {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+    return { data, error };
+  },
+
+  async deleteUser(userId: string) {
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId);
+    return { error };
+  },
+
   // Missions
   async getMissions() {
     const { data, error } = await supabase
@@ -307,19 +323,22 @@ export const db = {
     const formattedData = data?.map(path => ({
       ...path,
       name: path.title, // Align with UI expectation
+      difficulty: path.level?.toLowerCase() || 'intermediate', // For UI
       missions: path.path_missions?.map((pm: any) => pm.mission_id) || []
     }));
 
     return { data: formattedData, error };
   },
-
   async createLearningPath(path: any) {
+    const rawLevel = path.level || path.difficulty || 'Intermediate';
+    const capitalizedLevel = rawLevel.charAt(0).toUpperCase() + rawLevel.slice(1).toLowerCase();
+
     const { data: pathData, error: pathError } = await supabase
       .from('learning_paths')
       .insert([{
         title: path.title || path.name, // Support both
         description: path.description,
-        level: path.level || path.difficulty || 'Intermediate',
+        level: capitalizedLevel,
         estimated_hours: path.estimated_hours,
         created_by: path.user_id,
         is_published: true,
@@ -344,12 +363,15 @@ export const db = {
   },
 
   async updateLearningPath(id: string, updates: any) {
+    const rawLevel = updates.level || updates.difficulty;
+    const capitalizedLevel = rawLevel ? rawLevel.charAt(0).toUpperCase() + rawLevel.slice(1).toLowerCase() : undefined;
+
     const { data, error } = await supabase
       .from('learning_paths')
       .update({
         title: updates.title || updates.name,
         description: updates.description,
-        level: updates.level || updates.difficulty,
+        level: capitalizedLevel,
         estimated_hours: updates.estimated_hours,
         is_published: updates.is_published,
       })
@@ -383,6 +405,33 @@ export const db = {
       .delete()
       .eq('id', id);
     return { error };
+  },
+
+  async getLearningPath(id: string) {
+    const { data, error } = await supabase
+      .from('learning_paths')
+      .select(`
+        *,
+        path_missions (
+          order_index,
+          missions (*)
+        )
+      `)
+      .eq('id', id)
+      .single();
+    
+    if (error) return { data: null, error };
+
+    const formattedData = {
+      ...data,
+      name: data.title,
+      difficulty: data.level?.toLowerCase() || 'intermediate',
+      missions: data.path_missions
+        ?.sort((a: any, b: any) => a.order_index - b.order_index)
+        ?.map((pm: any) => pm.missions) || []
+    };
+
+    return { data: formattedData, error: null };
   },
 
   // Help Articles (ヘルプセンター)
@@ -439,19 +488,28 @@ export const db = {
       `)
       .order('created_at', { ascending: false });
     
-    const formattedData = data?.map(post => ({
-      ...post,
-      upvotes: post.qa_post_votes?.length || 0,
-      voters: post.qa_post_votes?.map((v: any) => v.users?.name) || [],
-      answers: post.qa_answers?.map((a: any) => ({
-        ...a,
-        upvotes: a.qa_answer_votes?.length || 0,
-        voters: a.qa_answer_votes?.map((v: any) => v.users?.name) || [],
-        created_by: a.users?.name || 'Anonymous'
-      })) || [],
-      answers_count: post.qa_answers?.length || 0,
-      created_by: post.users?.name || 'Anonymous'
-    }));
+    const formattedData = data?.map(post => {
+      // Handle the case where 'users' might be an array or an object
+      const postUser = Array.isArray(post.users) ? post.users[0] : post.users;
+      const authorName = postUser?.name || 'Anonymous';
+
+      return {
+        ...post,
+        upvotes: post.qa_post_votes?.length || 0,
+        voters: post.qa_post_votes?.map((v: any) => v.users?.name) || [],
+        answers: post.qa_answers?.map((a: any) => {
+          const answerUser = Array.isArray(a.users) ? a.users[0] : a.users;
+          return {
+            ...a,
+            upvotes: a.qa_answer_votes?.length || 0,
+            voters: a.qa_answer_votes?.map((v: any) => v.users?.name) || [],
+            created_by: answerUser?.name || 'Anonymous'
+          };
+        }) || [],
+        answers_count: post.qa_answers?.length || 0,
+        created_by: authorName
+      };
+    });
 
     return { data: formattedData, error };
   },

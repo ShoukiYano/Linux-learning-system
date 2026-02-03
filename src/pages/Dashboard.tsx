@@ -11,11 +11,14 @@ export const Dashboard = () => {
   const { user } = useAuth();
   const [completedMissionsCount, setCompletedMissionsCount] = useState(0);
   const [activityData, setActivityData] = useState<{ name: string; cmd: number }[]>([]);
+  const [learningPaths, setLearningPaths] = useState<any[]>([]);
+  const [userMissions, setUserMissions] = useState<any[]>([]);
 
   useEffect(() => {
     if (user?.id) {
       fetchUserMissions();
       fetchActivity();
+      fetchLearningPaths();
     }
   }, [user]);
 
@@ -23,7 +26,15 @@ export const Dashboard = () => {
     if (!user?.id) return;
     const { data } = await db.getUserMissions(user.id);
     if (data) {
+      setUserMissions(data);
       setCompletedMissionsCount(data.filter(m => m.is_completed).length);
+    }
+  };
+
+  const fetchLearningPaths = async () => {
+    const { data } = await db.getLearningPaths();
+    if (data) {
+      setLearningPaths(data);
     }
   };
 
@@ -77,26 +88,47 @@ export const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Main Hero Card */}
-          <div className="lg:col-span-2 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-8 border border-slate-700 relative overflow-hidden">
+          {/* Main Hero Card - Now emphasizing Learning Tracks */}
+          <div className="lg:col-span-2 bg-gradient-to-br from-indigo-900/40 to-slate-900 rounded-2xl p-8 border border-primary-500/20 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
             
             <div className="relative z-10">
               <span className="inline-block px-3 py-1 rounded-full bg-primary-500/20 text-primary-400 text-xs font-bold mb-4">
-                推奨
+                学習コースを始める
               </span>
-              <h2 className="text-2xl font-bold mb-2">次のミッションに挑戦しよう</h2>
+              <h2 className="text-2xl font-bold mb-2">学習パス（コース）で効率的に学ぶ</h2>
               <p className="text-slate-400 mb-6 max-w-lg">
-                Linux の基本コマンドから管理スキルまで、段階的に学習できます。
+                ミッションを目標別にまとめた「学習パス」なら、迷わずステップアップできます。
               </p>
               
-              <div className="flex items-center gap-4 mb-6 text-sm text-slate-400">
-                <span className="flex items-center gap-1"><Terminal size={16}/> 初級から上級</span>
-                <span className="flex items-center gap-1"><Zap size={16}/> XP 獲得</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {learningPaths.slice(0, 2).map(path => {
+                  const pathMissionsCount = path.missions?.length || 0;
+                  const completedInPath = path.missions?.filter((mId: string) => 
+                    userMissions.find(um => um.mission_id === mId && um.is_completed)
+                  ).length || 0;
+                  const progress = pathMissionsCount > 0 ? (completedInPath / pathMissionsCount) * 100 : 0;
+
+                  return (
+                    <div key={path.id} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                      <div className="text-sm font-bold mb-1">{path.name}</div>
+                      <div className="text-xs text-slate-500 mb-3">{pathMissionsCount} ミッション</div>
+                      <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary-500 transition-all duration-500" 
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <div className="text-[10px] text-primary-400 mt-1 font-bold">
+                        {completedInPath}/{pathMissionsCount} 完了
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              <Link to="/missions" className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white px-6 py-3 rounded-lg font-bold transition-colors">
-                ミッション一覧を見る <ArrowRight size={18} />
+              <Link to="/curriculum" className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white px-6 py-3 rounded-lg font-bold transition-colors shadow-lg shadow-primary-500/20">
+                すべての学習パスを見る <ArrowRight size={18} />
               </Link>
             </div>
           </div>

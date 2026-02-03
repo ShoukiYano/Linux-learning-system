@@ -7,6 +7,7 @@ export interface User {
   streak: number;
   avatarUrl?: string;
   role: 'user' | 'admin';
+  created_at?: string;
 }
 
 export interface Mission {
