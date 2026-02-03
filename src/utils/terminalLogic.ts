@@ -441,8 +441,9 @@ export const executeCommand = (
       const buildMatcher = () => {
         const ignoreCase = opts.has('i');
         const invert = opts.has('v');
+        const isRegex = opts.has('E');
 
-        const useRegex = opts.has('x') || opts.has('w');
+        const useRegex = isRegex || opts.has('x') || opts.has('w');
 
         if (!useRegex) {
           const pat = ignoreCase ? pattern.toLowerCase() : pattern;
@@ -471,8 +472,8 @@ export const executeCommand = (
           };
         }
 
-        const lit = escapeRegExp(pattern);
-        let reSrc = lit;
+        const reSrcBase = isRegex ? pattern : escapeRegExp(pattern);
+        let reSrc = reSrcBase;
         if (opts.has('w')) reSrc = `\\b${reSrc}\\b`;
         if (opts.has('x')) reSrc = `^${reSrc}$`;
 
