@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Terminal, Shield, Zap, ChevronRight, Star } from 'lucide-react';
+import { Terminal, Shield, Zap, ChevronRight, Star, Users, Globe } from 'lucide-react';
 
 export const Landing = () => {
   return (
@@ -13,7 +13,6 @@ export const Landing = () => {
             <span className="font-bold text-xl tracking-tight">L-Quest</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#features" className="hover:text-white transition-colors">機能</a>
             <a href="#demo" className="hover:text-white transition-colors">デモ</a>
             <Link to="/login" className="hover:text-white transition-colors">ログイン</Link>
             <Link to="/register" className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2 rounded-full transition-all shadow-lg shadow-primary-500/20">
@@ -102,7 +101,7 @@ export const Landing = () => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
             <span className="text-primary-500 font-bold text-sm tracking-wider uppercase">Core Features</span>
-            <h2 className="text-4xl font-bold mt-2 mb-4">挫折しないための3つの強力な武器</h2>
+            <h2 className="text-4xl font-bold mt-2 mb-4">挫折しないための5つの強力な武器</h2>
             <p className="text-slate-400 max-w-2xl mx-auto">
               L-Questなら、黒い画面への恐怖心を解消。直感的な操作と丁寧な解説で、迷わずスキルアップできます。
             </p>
@@ -112,7 +111,9 @@ export const Landing = () => {
             {[
               { icon: Zap, title: 'GUI ⟷ CLI 完全同期', desc: 'コマンド操作がリアルタイムでGUIウィンドウに反映。ファイルが動く様子を目で見て確認できるから、裏側の仕組みが直感的に理解できます。', highlight: true },
               { icon: Terminal, title: 'AIエラー翻訳', desc: '初心者の最大の壁「英語のエラーメッセージ」を日本語で分かりやすく解説。「なぜエラーが出たのか」「どう直せばいいか」を瞬時に提案します。' },
-              { icon: Shield, title: 'RPG型クエスト学習', desc: '実務で使うシナリオをテキスト形式で体験。「サーバーを復旧せよ」「ログを解析せよ」など、物語を進める感覚でスキルが身につきます。' }
+              { icon: Users, title: '助け合えるコミュニティ', desc: '分からないことはコミュニティで質問。先輩エンジニアやAIがあなたの学習をサポートします。投票機能で役立つ情報がすぐに見つかります。' },
+              { icon: Shield, title: 'RPG型クエスト学習', desc: '実務で使うシナリオをクエスト形式で体験。「サーバーを復旧せよ」など、物語を進める感覚でスキルが身につきます。' },
+              { icon: Globe, title: 'OS不問・環境構築不要', desc: 'ブラウザさえあれば、WindowsでもMacでもすぐにLinux環境が手に入ります。複雑な初期設定で挫折することはありません。' }
             ].map((feature, i) => (
               <div key={i} className={`p-8 rounded-2xl border transition-all group ${feature.highlight ? 'bg-primary-500/10 border-primary-500/30 shadow-lg shadow-primary-500/10' : 'bg-slate-800 border-slate-700 hover:border-primary-500/30'}`}>
                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${feature.highlight ? 'bg-primary-500/20 text-primary-400' : 'bg-slate-900 text-primary-500'}`}>
@@ -253,7 +254,7 @@ export const Landing = () => {
       {/* Testimonials */}
       <section className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">30,000人以上のエンジニアが体験</h2>
+          <h2 className="text-3xl font-bold text-center mb-12">数々のユーザーが体験</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               { name: '田中 健太', role: 'Webエンジニア 1年目', text: '「黒い画面」アレルギーでしたが、L-Questのおかげで克服できました。特にエラーが出たときに日本語で優しく教えてくれる機能には何度も助けられました。' },
@@ -281,7 +282,7 @@ export const Landing = () => {
       {/* CTA */}
       <section className="py-20 text-center px-6">
         <h2 className="text-4xl font-bold mb-6">あなたのキャリアを、<br/>コマンド一つで変える。</h2>
-        <p className="text-slate-400 mb-8">まずは2週間の無料体験から。<br/>Linuxの世界へのパスポートは、すでに開かれています。</p>
+        <p className="text-slate-400 mb-8">実践で身につくLinuxスキル。<br/>Linuxの世界へのパスポートは、すでに開かれています。</p>
         <Link to="/register" className="inline-flex items-center gap-2 px-8 py-4 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-bold text-lg shadow-xl shadow-primary-500/20 transition-all">
           今すぐ無料で始める <ChevronRight />
         </Link>
