@@ -136,7 +136,6 @@ export const Leaderboard = () => {
                         </div>
                         <div>
                           <p className="font-medium text-white">{user.name}</p>
-                          <p className="text-sm text-slate-400">{user.email}</p>
                         </div>
                       </div>
                     </td>
