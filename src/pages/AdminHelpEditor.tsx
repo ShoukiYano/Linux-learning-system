@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Trash2, Edit, Plus, BookOpenCheck } from 'lucide-react';
 
 export const AdminHelpEditor = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const navigate = useNavigate();
   const [articles, setArticles] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -50,7 +50,7 @@ export const AdminHelpEditor = () => {
       if (editingArticle) {
         await db.updateHelpArticle(editingArticle.id, formData);
       } else {
-        await db.createHelpArticle(formData);
+        await db.createHelpArticle({ ...formData, user_id: user?.id });
       }
       resetForm();
       fetchArticles();

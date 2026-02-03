@@ -10,10 +10,12 @@ import { MISSIONS } from '../constants';
 export const Dashboard = () => {
   const { user } = useAuth();
   const [completedMissionsCount, setCompletedMissionsCount] = useState(0);
+  const [activityData, setActivityData] = useState<{ name: string; cmd: number }[]>([]);
 
   useEffect(() => {
     if (user?.id) {
       fetchUserMissions();
+      fetchActivity();
     }
   }, [user]);
 
@@ -25,17 +27,35 @@ export const Dashboard = () => {
     }
   };
 
-  const progressPercentage = Math.round((completedMissionsCount / MISSIONS.length) * 100);
+  const fetchActivity = async () => {
+    if (!user?.id) return;
+    const { data } = await db.getWeeklyActivity(user.id);
+    if (data) {
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const counts: { [key: string]: number } = {
+        'Sun': 0, 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0
+      };
 
-  const ACTIVITY_DATA = [
-    { name: 'Mon', cmd: 4 },
-    { name: 'Tue', cmd: 3 },
-    { name: 'Wed', cmd: 2 },
-    { name: 'Thu', cmd: 5 },
-    { name: 'Fri', cmd: 2 },
-    { name: 'Sat', cmd: 2 },
-    { name: 'Sun', cmd: 3 },
-  ];
+      data.forEach(activity => {
+        if (activity.type === 'command_execution') {
+          const date = new Date(activity.created_at);
+          const dayName = days[date.getDay()];
+          counts[dayName]++;
+        }
+      });
+
+      const formattedData = days.map(day => ({
+        name: day,
+        cmd: counts[day]
+      }));
+
+      // 週の並びを今日を最後にするように調整することもできるが、
+      // 一般的には月〜日で固定か、日〜土で固定
+      setActivityData(formattedData);
+    }
+  };
+
+  const progressPercentage = Math.round((completedMissionsCount / MISSIONS.length) * 100);
 
   return (
     <Layout>
@@ -152,7 +172,10 @@ export const Dashboard = () => {
         <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 mb-8">
           <h3 className="font-bold text-lg mb-4">今週のアクティビティ</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={ACTIVITY_DATA}>
+            <BarChart data={activityData.length > 0 ? activityData : [
+              { name: 'Mon', cmd: 0 }, { name: 'Tue', cmd: 0 }, { name: 'Wed', cmd: 0 },
+              { name: 'Thu', cmd: 0 }, { name: 'Fri', cmd: 0 }, { name: 'Sat', cmd: 0 }, { name: 'Sun', cmd: 0 }
+            ]}>
               <XAxis dataKey="name" stroke="#64748b" />
               <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f1f5f9' }} />
               <Bar dataKey="cmd" fill="#8b5cf6" radius={[8, 8, 0, 0]} />

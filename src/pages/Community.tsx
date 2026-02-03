@@ -46,12 +46,16 @@ export const Community = () => {
     }
 
     try {
+      if (!user?.id) {
+        alert('ログインしてください');
+        return;
+      }
+
       await db.createQAPost({
         title: newPostTitle,
         content: newPostContent,
         tags: newPostTags.split(',').map(t => t.trim()).filter(t => t),
-        user_id: user?.id || '',
-        created_by: user?.name || 'Anonymous',
+        user_id: user.id,
       });
       setNewPostTitle('');
       setNewPostContent('');
@@ -68,11 +72,15 @@ export const Community = () => {
     if (!answerText.trim()) return;
 
     try {
+      if (!user?.id) {
+        alert('ログインしてください');
+        return;
+      }
+
       await db.createQAAnswer({
         post_id: postId,
         content: answerText,
-        user_id: user?.id || '',
-        created_by: user?.name || 'Anonymous',
+        user_id: user.id,
       });
       setAnswerText('');
       fetchPosts();
@@ -80,6 +88,32 @@ export const Community = () => {
     } catch (error) {
       console.error('Error creating answer:', error);
       alert('回答の投稿に失敗しました');
+    }
+  };
+
+  const handleToggleVote = async (postId: string) => {
+    if (!user?.id) {
+      alert('ログインしてください');
+      return;
+    }
+    try {
+      await db.toggleQAPostVote(postId, user.id);
+      fetchPosts();
+    } catch (error) {
+      console.error('Error toggling vote:', error);
+    }
+  };
+
+  const handleToggleAnswerVote = async (answerId: string) => {
+    if (!user?.id) {
+      alert('ログインしてください');
+      return;
+    }
+    try {
+      await db.toggleQAAnswerVote(answerId, user.id);
+      fetchPosts();
+    } catch (error) {
+      console.error('Error toggling answer vote:', error);
     }
   };
 
@@ -179,7 +213,7 @@ export const Community = () => {
                 <div>
                   <h3 className="text-lg font-bold mb-1">{post.title}</h3>
                   <p className="text-sm text-slate-400">
-                    投稿者: {post.created_by} • {new Date(post.created_at).toLocaleDateString('ja-JP')}
+                    投稿者: {post.users?.name || post.created_by} • {new Date(post.created_at).toLocaleDateString('ja-JP')}
                   </p>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-sm font-bold ${
@@ -205,9 +239,21 @@ export const Community = () => {
 
               <div className="flex items-center justify-between pt-4 border-t border-slate-700">
                 <div className="flex items-center gap-4">
-                  <button className="flex items-center gap-1 text-slate-400 hover:text-primary-400 transition-colors">
-                    <ThumbsUp size={18} />
+                  <button 
+                    onClick={() => handleToggleVote(post.id)}
+                    className={`flex items-center gap-1 transition-colors group relative ${
+                      post.voters?.includes(user?.name) ? 'text-primary-400' : 'text-slate-400 hover:text-primary-400'
+                    }`}
+                  >
+                    <ThumbsUp size={18} fill={post.voters?.includes(user?.name) ? "currentColor" : "none"} />
                     <span className="text-sm">{post.upvotes || 0}</span>
+                    
+                    {/* Tooltip */}
+                    {post.voters && post.voters.length > 0 && (
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 text-[10px] py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                        {post.voters.join(', ')}
+                      </div>
+                    )}
                   </button>
                   <button
                     onClick={() => setSelectedPost(selectedPost?.id === post.id ? null : post)}
@@ -227,9 +273,27 @@ export const Community = () => {
                     {post.answers && post.answers.length > 0 ? (
                       post.answers.map((answer: any) => (
                         <div key={answer.id} className="bg-slate-900/50 rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-bold text-primary-400">{answer.created_by}</span>
-                            {answer.is_accepted && <span className="text-xs font-bold text-green-400">✓ ベストアンサー</span>}
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <span className="text-sm font-bold text-primary-400">{answer.users?.name || answer.created_by}</span>
+                              {answer.is_accepted && <span className="ml-2 text-xs font-bold text-green-400">✓ ベストアンサー</span>}
+                            </div>
+                            <button 
+                              onClick={() => handleToggleAnswerVote(answer.id)}
+                              className={`flex items-center gap-1 transition-colors group relative ${
+                                answer.voters?.includes(user?.name) ? 'text-primary-400' : 'text-slate-500 hover:text-primary-400'
+                              }`}
+                            >
+                              <ThumbsUp size={14} fill={answer.voters?.includes(user?.name) ? "currentColor" : "none"} />
+                              <span className="text-xs">{answer.upvotes || 0}</span>
+
+                              {/* Tooltip */}
+                              {answer.voters && answer.voters.length > 0 && (
+                                <div className="absolute bottom-full mb-2 right-0 bg-slate-900 border border-slate-700 text-[10px] py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                  {answer.voters.join(', ')}
+                                </div>
+                              )}
+                            </button>
                           </div>
                           <p className="text-slate-300">{answer.content}</p>
                           <p className="text-xs text-slate-500 mt-2">

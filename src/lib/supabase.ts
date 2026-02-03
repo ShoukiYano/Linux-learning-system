@@ -244,6 +244,20 @@ export const db = {
     return { data, error };
   },
 
+  async getWeeklyActivity(userId: string) {
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
+    const { data, error } = await supabase
+      .from('activities')
+      .select('created_at, type')
+      .eq('user_id', userId)
+      .gte('created_at', lastWeek.toISOString())
+      .order('created_at', { ascending: true });
+    
+    return { data, error };
+  },
+
   // Commands (辞典)
   async getCommands() {
     const { data, error } = await supabase
@@ -284,27 +298,82 @@ export const db = {
   async getLearningPaths() {
     const { data, error } = await supabase
       .from('learning_paths')
-      .select('*')
+      .select(`
+        *,
+        path_missions (mission_id)
+      `)
       .order('created_at', { ascending: false });
-    return { data, error };
+    
+    const formattedData = data?.map(path => ({
+      ...path,
+      name: path.title, // Align with UI expectation
+      missions: path.path_missions?.map((pm: any) => pm.mission_id) || []
+    }));
+
+    return { data: formattedData, error };
   },
 
   async createLearningPath(path: any) {
-    const { data, error } = await supabase
+    const { data: pathData, error: pathError } = await supabase
       .from('learning_paths')
-      .insert([path])
+      .insert([{
+        title: path.title || path.name, // Support both
+        description: path.description,
+        level: path.level || path.difficulty || 'Intermediate',
+        estimated_hours: path.estimated_hours,
+        created_by: path.user_id,
+        is_published: true,
+      }])
       .select()
       .single();
-    return { data, error };
+    
+    if (pathError) return { data: null, error: pathError };
+
+    // Link missions if provided
+    if (path.missions && path.missions.length > 0) {
+      const pathMissions = path.missions.map((missionId: string, index: number) => ({
+        path_id: pathData.id,
+        mission_id: missionId,
+        order_index: index,
+      }));
+
+      await supabase.from('path_missions').insert(pathMissions);
+    }
+
+    return { data: pathData, error: null };
   },
 
   async updateLearningPath(id: string, updates: any) {
     const { data, error } = await supabase
       .from('learning_paths')
-      .update(updates)
+      .update({
+        title: updates.title || updates.name,
+        description: updates.description,
+        level: updates.level || updates.difficulty,
+        estimated_hours: updates.estimated_hours,
+        is_published: updates.is_published,
+      })
       .eq('id', id)
       .select()
       .single();
+    
+    if (error) return { data, error };
+
+    // Update missions if provided
+    if (updates.missions) {
+      // Simplest: delete and re-insert
+      await supabase.from('path_missions').delete().eq('path_id', id);
+      
+      if (updates.missions.length > 0) {
+        const pathMissions = updates.missions.map((missionId: string, index: number) => ({
+          path_id: id,
+          mission_id: missionId,
+          order_index: index,
+        }));
+        await supabase.from('path_missions').insert(pathMissions);
+      }
+    }
+
     return { data, error };
   },
 
@@ -321,7 +390,6 @@ export const db = {
     const { data, error } = await supabase
       .from('help_articles')
       .select('*')
-      .eq('is_published', true)
       .order('created_at', { ascending: false });
     return { data, error };
   },
@@ -329,7 +397,13 @@ export const db = {
   async createHelpArticle(article: any) {
     const { data, error } = await supabase
       .from('help_articles')
-      .insert([article])
+      .insert([{
+        title: article.title,
+        content: article.content,
+        category: article.category,
+        is_published: article.is_published,
+        created_by: article.user_id,
+      }])
       .select()
       .single();
     return { data, error };
@@ -349,15 +423,117 @@ export const db = {
   async getQAPosts() {
     const { data, error } = await supabase
       .from('qa_posts')
-      .select('*, user:users(id,name,avatar_url), answers:qa_answers(count)')
+      .select(`
+        *,
+        users (id, name, avatar_url),
+        qa_post_votes (
+          users (id, name)
+        ),
+        qa_answers (
+          *,
+          users (id, name, avatar_url),
+          qa_answer_votes (
+            users (id, name)
+          )
+        )
+      `)
       .order('created_at', { ascending: false });
-    return { data, error };
+    
+    const formattedData = data?.map(post => ({
+      ...post,
+      upvotes: post.qa_post_votes?.length || 0,
+      voters: post.qa_post_votes?.map((v: any) => v.users?.name) || [],
+      answers: post.qa_answers?.map((a: any) => ({
+        ...a,
+        upvotes: a.qa_answer_votes?.length || 0,
+        voters: a.qa_answer_votes?.map((v: any) => v.users?.name) || [],
+        created_by: a.users?.name || 'Anonymous'
+      })) || [],
+      answers_count: post.qa_answers?.length || 0,
+      created_by: post.users?.name || 'Anonymous'
+    }));
+
+    return { data: formattedData, error };
+  },
+
+  async toggleQAPostVote(postId: string, userId: string) {
+    // Check if vote exists
+    const { data: existingVote, error: checkError } = await supabase
+      .from('qa_post_votes')
+      .select('id')
+      .eq('post_id', postId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking vote:', checkError);
+      return { error: checkError };
+    }
+
+    if (existingVote) {
+      // Remove vote
+      return await supabase
+        .from('qa_post_votes')
+        .delete()
+        .eq('id', existingVote.id);
+    } else {
+      // Add vote
+      return await supabase
+        .from('qa_post_votes')
+        .insert([{ post_id: postId, user_id: userId }]);
+    }
+  },
+
+  async toggleQAAnswerVote(answerId: string, userId: string) {
+    const { data: existingVote, error: checkError } = await supabase
+      .from('qa_answer_votes')
+      .select('id')
+      .eq('answer_id', answerId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking answer vote:', checkError);
+      return { error: checkError };
+    }
+
+    if (existingVote) {
+      return await supabase
+        .from('qa_answer_votes')
+        .delete()
+        .eq('id', existingVote.id);
+    } else {
+      return await supabase
+        .from('qa_answer_votes')
+        .insert([{ answer_id: answerId, user_id: userId }]);
+    }
+  },
+
+  async deleteQAPost(postId: string) {
+    const { error } = await supabase
+      .from('qa_posts')
+      .delete()
+      .eq('id', postId);
+    return { error };
+  },
+
+  async deleteQAAnswer(answerId: string) {
+    const { error } = await supabase
+      .from('qa_answers')
+      .delete()
+      .eq('id', answerId);
+    return { error };
   },
 
   async createQAPost(post: any) {
     const { data, error } = await supabase
       .from('qa_posts')
-      .insert([post])
+      .insert([{
+        user_id: post.user_id,
+        title: post.title,
+        content: post.content,
+        tags: post.tags || [],
+      }])
       .select()
       .single();
     return { data, error };
@@ -366,7 +542,11 @@ export const db = {
   async createQAAnswer(answer: any) {
     const { data, error } = await supabase
       .from('qa_answers')
-      .insert([answer])
+      .insert([{
+        post_id: answer.post_id,
+        user_id: answer.user_id,
+        content: answer.content,
+      }])
       .select()
       .single();
     return { data, error };
@@ -374,24 +554,86 @@ export const db = {
 
   // Admin Stats
   async getAdminStats() {
-    const { data: userCount } = await supabase
+    // Basic counts
+    const { count: userCount } = await supabase
       .from('users')
-      .select('id', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true });
     
-    const { data: missionCount } = await supabase
+    const { count: missionCount } = await supabase
       .from('missions')
-      .select('id', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true });
+
+    // Activities today (unique users who ran commands)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const { data: todayActivities } = await supabase
+      .from('activities')
+      .select('user_id')
+      .gte('created_at', today.toISOString())
+      .eq('type', 'command_execution');
     
+    const activeToday = new Set(todayActivities?.map(a => a.user_id)).size;
+
+    // New signups today
+    const { count: newSignupsToday } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', today.toISOString());
+
+    // Users not active for more than 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    // This is a bit complex in Supabase without a join or last_active field. 
+    // For now, let's use the created_at of users or assume a simple metric.
+    // Ideally we'd select users WHERE NOT EXISTS (activity in last 7 days)
+    const { data: recentActiveUsers } = await supabase
+      .from('activities')
+      .select('user_id')
+      .gte('created_at', sevenDaysAgo.toISOString());
+    
+    const activeIds = new Set(recentActiveUsers?.map(a => a.user_id));
+    const inactiveCount = (userCount || 0) - activeIds.size;
+
     const { data: topUsers } = await supabase
       .from('users')
       .select('id, name, xp, level')
       .order('xp', { ascending: false })
       .limit(5);
 
+    // Weekly activity for all users
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    const { data: weeklyData } = await supabase
+      .from('activities')
+      .select('created_at')
+      .gte('created_at', lastWeek.toISOString())
+      .eq('type', 'command_execution');
+
+    // Recent activities for the table
+    const { data: recentActivities } = await supabase
+      .from('activities')
+      .select('*, users(name)')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    // Recent signups for the table
+    const { data: recentUsers } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
     return {
-      userCount: userCount?.length || 0,
-      missionCount: missionCount?.length || 0,
+      userCount: userCount || 0,
+      missionCount: missionCount || 0,
+      activeToday,
+      newSignupsToday: newSignupsToday || 0,
+      inactiveCount: Math.max(0, inactiveCount),
       topUsers,
+      weeklyData: weeklyData || [],
+      recentActivities: recentActivities || [],
+      recentUsers: recentUsers || [],
     };
   },
 

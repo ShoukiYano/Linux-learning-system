@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Trash2, Edit, Plus, BookOpen } from 'lucide-react';
 
 export const AdminLearningPathEditor = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const navigate = useNavigate();
   const [paths, setPaths] = useState<any[]>([]);
   const [missions, setMissions] = useState<any[]>([]);
@@ -53,11 +53,17 @@ export const AdminLearningPathEditor = () => {
 
     try {
       if (editingPath) {
-        await db.updateLearningPath(editingPath.id, formData);
+        await db.updateLearningPath(editingPath.id, {
+          ...formData,
+          title: formData.name,
+          user_id: user?.id
+        });
       } else {
         await db.createLearningPath({
           ...formData,
+          title: formData.name,
           missions: selectedMissions,
+          user_id: user?.id,
         });
       }
       resetForm();
@@ -71,11 +77,12 @@ export const AdminLearningPathEditor = () => {
   const handleEdit = (path: any) => {
     setEditingPath(path);
     setFormData({
-      name: path.name,
+      name: path.name || path.title,
       description: path.description || '',
-      difficulty: path.difficulty || 'intermediate',
+      difficulty: path.difficulty || path.level?.toLowerCase() || 'intermediate',
       estimated_hours: path.estimated_hours || 10,
     });
+    setSelectedMissions(path.missions || []);
     setShowForm(true);
   };
 

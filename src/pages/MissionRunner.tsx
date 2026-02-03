@@ -217,6 +217,16 @@ export const MissionRunner = () => {
       cwd: cwd 
     };
     setCommandLog(prev => [...prev, newCommand]);
+
+    // Log activity to database
+    if (user?.id) {
+      db.logActivity(user.id, {
+        type: 'command_execution',
+        missionId: mission?.id,
+        command: cmd,
+        description: `コマンド実行: ${cmd}`
+      });
+    }
   };
 
   const checkProgress = () => {

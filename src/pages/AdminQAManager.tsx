@@ -49,14 +49,16 @@ export const AdminQAManager = () => {
   const handleDeletePost = async (postId: string) => {
     if (confirm('この質問を削除しますか？')) {
       try {
-        await db.supabase
-          .from('qa_posts')
-          .delete()
-          .eq('id', postId);
+        const { error } = await db.deleteQAPost(postId);
+        if (error) {
+          alert('削除に失敗しました: ' + error.message);
+          return;
+        }
         fetchPosts();
         setSelectedPost(null);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error deleting post:', error);
+        alert('削除中にエラーが発生しました');
       }
     }
   };
@@ -64,13 +66,21 @@ export const AdminQAManager = () => {
   const handleDeleteAnswer = async (answerId: string) => {
     if (confirm('この回答を削除しますか？')) {
       try {
-        await db.supabase
-          .from('qa_answers')
-          .delete()
-          .eq('id', answerId);
+        const { error } = await db.deleteQAAnswer(answerId);
+        if (error) {
+          alert('削除に失敗しました: ' + error.message);
+          return;
+        }
         fetchPosts();
-      } catch (error) {
+        if (selectedPost) {
+           // Refresh selected post data to remove deleted answer from view
+           const { data } = await db.getQAPosts();
+           const updated = data?.find((p: any) => p.id === selectedPost.id);
+           if (updated) setSelectedPost(updated);
+        }
+      } catch (error: any) {
         console.error('Error deleting answer:', error);
+        alert('削除中にエラーが発生しました');
       }
     }
   };

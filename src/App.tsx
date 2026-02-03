@@ -11,6 +11,7 @@ import { MissionRunner } from './pages/MissionRunner';
 import { Dictionary } from './pages/Dictionary';
 import { Profile } from './pages/Profile';
 import { Leaderboard } from './pages/Leaderboard';
+import { AdminDashboard } from './pages/AdminDashboard';
 import { Admin } from './pages/Admin';
 import { AdminCommandEditor } from './pages/AdminCommandEditor';
 import { AdminLearningPathEditor } from './pages/AdminLearningPathEditor';
@@ -40,7 +41,8 @@ const App = () => {
           <Route path="/leaderboard" element={<Leaderboard />} />
           
           {/* Admin Routes */}
-          <Route path="/admin" element={<Admin />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/missions" element={<Admin />} />
           <Route path="/admin/commands" element={<AdminCommandEditor />} />
           <Route path="/admin/learning-paths" element={<AdminLearningPathEditor />} />
           <Route path="/admin/help" element={<AdminHelpEditor />} />

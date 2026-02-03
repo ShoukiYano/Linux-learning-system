@@ -273,7 +273,7 @@ export const Admin = () => {
 
         {/* Admin Tools Menu */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
-          <Link to="/admin" className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105">
+          <Link to="/admin/missions" className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105">
             <div className="text-2xl mb-2">📋</div>
             <h3 className="font-bold text-sm">ミッション</h3>
           </Link>
