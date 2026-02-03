@@ -511,6 +511,9 @@ export const executeCommand = (
         // 755 -> drwxr-xr-x 変換のような簡易ロジックを入れる
         if (mode === '755') nodeChmod.permissions = nodeChmod.type === 'directory' ? 'drwxr-xr-x' : '-rwxr-xr-x';
         else if (mode === '644') nodeChmod.permissions = '-rw-r--r--';
+        else if (mode === '777') nodeChmod.permissions = nodeChmod.type === 'directory' ? 'drwxrwxrwx' : '-rwxrwxrwx';
+        else if (mode === '700') nodeChmod.permissions = nodeChmod.type === 'directory' ? 'drwx------' : '-rwx------';
+        else if (mode === '600') nodeChmod.permissions = nodeChmod.type === 'directory' ? 'drwx------' : '-rwx------';
         else if (mode === '+x') nodeChmod.permissions = nodeChmod.permissions?.replace(/-/g, 'x') || '-rwxr-xr-x';
         else nodeChmod.permissions = mode; // Fallback
         
