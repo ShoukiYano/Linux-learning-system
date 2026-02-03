@@ -563,13 +563,18 @@ export const db = {
       .from('missions')
       .select('*', { count: 'exact', head: true });
 
-    // Activities today (unique users who ran commands)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Activities today (unique users who ran commands) - JST Boundary
+    const now = new Date();
+    const jstOffset = 9 * 60 * 60 * 1000; // JST is UTC+9
+    const todayJST = new Date(now.getTime() + jstOffset);
+    todayJST.setUTCHours(0, 0, 0, 0);
+    // Convert back to UTC for the query since DB stores in UTC
+    const todayStartUTC = new Date(todayJST.getTime() - jstOffset).toISOString();
+
     const { data: todayActivities } = await supabase
       .from('activities')
       .select('user_id')
-      .gte('created_at', today.toISOString())
+      .gte('created_at', todayStartUTC)
       .eq('type', 'command_execution');
     
     const activeToday = new Set(todayActivities?.map(a => a.user_id)).size;
@@ -578,7 +583,7 @@ export const db = {
     const { count: newSignupsToday } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true })
-      .gte('created_at', today.toISOString());
+      .gte('created_at', todayStartUTC);
 
     // Users not active for more than 7 days
     const sevenDaysAgo = new Date();
