@@ -405,48 +405,199 @@ export const executeCommand = (
     case 'grep': {
       const { options: grepOptionsRaw, params: grepParams } = parseArgs(args);
       const opts = parseOptions(grepOptionsRaw);
-      
+
       if (grepParams.length < 2) return 'grep: missing operand';
-      
+
       const pattern = grepParams[0];
-      const files = grepParams.slice(1);
-      
+      const targets = grepParams.slice(1);
+
+      // ---------------------------
+      // 数値系オプション（例: -m 3 / -m3 / -m=3）を拾う
+      // ---------------------------
+      const parseNumOpt = (key: string, rawList: string[]): number | null => {
+        const search = `-${key}`;
+        for (const raw of rawList) {
+          if (raw === search) continue;
+          if (raw.startsWith(search + '=')) {
+            const v = Number(raw.split('=')[1]);
+            return Number.isFinite(v) ? v : null;
+          }
+          if (raw.startsWith(search) && raw.length > search.length) {
+            const v = Number(raw.slice(search.length));
+            return Number.isFinite(v) ? v : null;
+          }
+        }
+        return null;
+      };
+
+      const maxPerFile = parseNumOpt('m', grepOptionsRaw);
+      const recursive = opts.has('r') || opts.has('R');
+
+      // ---------------------------
+      // マッチ判定（-i -v -w -x -o 対応）
+      // ---------------------------
+      const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      const buildMatcher = () => {
+        const ignoreCase = opts.has('i');
+        const invert = opts.has('v');
+
+        const useRegex = opts.has('x') || opts.has('w');
+
+        if (!useRegex) {
+          const pat = ignoreCase ? pattern.toLowerCase() : pattern;
+          return {
+            isMatchLine(line: string) {
+              const s = ignoreCase ? line.toLowerCase() : line;
+              const ok = s.includes(pat);
+              return invert ? !ok : ok;
+            },
+            findMatches(line: string) {
+              if (!opts.has('o')) return null;
+              if (invert) return [];
+              const s = ignoreCase ? line.toLowerCase() : line;
+              const base = ignoreCase ? pat : pattern;
+              
+              const matches: string[] = [];
+              let pos = 0;
+              while (true) {
+                const found = s.indexOf(base, pos);
+                if (found === -1) break;
+                matches.push(line.substring(found, found + base.length));
+                pos = found + base.length;
+              }
+              return matches;
+            }
+          };
+        }
+
+        const lit = escapeRegExp(pattern);
+        let reSrc = lit;
+        if (opts.has('w')) reSrc = `\\b${reSrc}\\b`;
+        if (opts.has('x')) reSrc = `^${reSrc}$`;
+
+        const flags = ignoreCase ? 'gi' : 'g';
+        const testFlags = ignoreCase ? 'i' : '';
+        const re = new RegExp(reSrc, flags);
+        const testRe = new RegExp(reSrc, testFlags);
+
+        return {
+          isMatchLine(line: string) {
+            const ok = testRe.test(line);
+            return invert ? !ok : ok;
+          },
+          findMatches(line: string) {
+            if (!opts.has('o')) return null;
+            if (invert) return [];
+            return line.match(re) || [];
+          }
+        };
+      };
+
+      const matcher = buildMatcher();
+
+      // ---------------------------
+      // 再帰走査（-r/-R）
+      // ---------------------------
+      const collectFiles = (node: FileSystemNode, basePath: string): {node: FileSystemNode, path: string}[] => {
+        const list: {node: FileSystemNode, path: string}[] = [];
+        if (!node) return list;
+        if (node.type === 'file') {
+          list.push({ node, path: basePath });
+          return list;
+        }
+        if (node.type === 'directory') {
+          const children = node.children || {};
+          for (const name of Object.keys(children)) {
+            const child = children[name];
+            const childPath = basePath.endsWith('/') ? (basePath + name) : (basePath + '/' + name);
+            list.push(...collectFiles(child, childPath));
+          }
+        }
+        return list;
+      };
+
+      // ---------------------------
+      // 出力制御：-h/-H, -l, -q, -c, -n
+      // ---------------------------
       let output = '';
-      
-      for (const file of files) {
-        const node = resolvePath(fs, cwd, file);
+
+      const shouldPrefixFilename = (multi: boolean) => {
+        if (opts.has('h')) return false;
+        if (opts.has('H')) return true;
+        return multi;
+      };
+
+      const expandedTargets: {node: FileSystemNode, path: string}[] = [];
+      for (const t of targets) {
+        const node = resolvePath(fs, cwd, t);
         if (!node) {
-          if (!opts.has('s')) output += `grep: ${file}: No such file or directory\n`;
+          if (!opts.has('s')) output += `grep: ${t}: No such file or directory\n`;
           continue;
         }
         if (node.type === 'directory') {
-          output += `grep: ${file}: Is a directory\n`;
-          continue;
-        }
-        
-        const lines = (node.content || '').split('\n');
-        let matches = 0;
-        
-        lines.forEach((line, idx) => {
-          const matchLine = opts.has('i') ? line.toLowerCase() : line;
-          const matchPat = opts.has('i') ? pattern.toLowerCase() : pattern;
-          const isMatch = opts.has('v') ? !matchLine.includes(matchPat) : matchLine.includes(matchPat);
-          
-          if (isMatch) {
-            matches++;
-            if (!opts.has('c')) {
-              let prefix = '';
-              if (files.length > 1) prefix += `${file}:`;
-              if (opts.has('n')) prefix += `${idx + 1}:`;
-              output += `${prefix}${line}\n`;
-            }
+          if (!recursive) {
+            output += `grep: ${t}: Is a directory\n`;
+            continue;
           }
-        });
-        
-        if (opts.has('c')) {
-          output += files.length > 1 ? `${file}:${matches}\n` : `${matches}\n`;
+          expandedTargets.push(...collectFiles(node, t));
+        } else {
+          expandedTargets.push({ node, path: t });
         }
       }
+
+      const multi = expandedTargets.length > 1;
+
+      for (const item of expandedTargets) {
+        const { node, path } = item;
+
+        const lines = (node.content || '').split('\n');
+        let matchesCount = 0;
+
+        for (let idx = 0; idx < lines.length; idx++) {
+          const line = lines[idx];
+          const isMatch = matcher.isMatchLine(line);
+
+          if (isMatch) {
+            matchesCount++;
+
+            if (opts.has('q')) return '';
+
+            if (!opts.has('c')) {
+              if (opts.has('l')) {
+                output += `${path}\n`;
+                break;
+              }
+
+              const showFile = shouldPrefixFilename(multi);
+              const showLine = opts.has('n');
+
+              const ms = matcher.findMatches(line);
+              if (opts.has('o') && ms) {
+                for (const m of ms) {
+                  let prefix = '';
+                  if (showFile) prefix += `${path}:`;
+                  if (showLine) prefix += `${idx + 1}:`;
+                  output += `${prefix}${m}\n`;
+                }
+              } else {
+                let prefix = '';
+                if (showFile) prefix += `${path}:`;
+                if (showLine) prefix += `${idx + 1}:`;
+                output += `${prefix}${line}\n`;
+              }
+            }
+
+            if (maxPerFile != null && matchesCount >= maxPerFile) break;
+          }
+        }
+
+        if (opts.has('c')) {
+          const showFile = shouldPrefixFilename(multi);
+          output += showFile ? `${path}:${matchesCount}\n` : `${matchesCount}\n`;
+        }
+      }
+
       return output.trimEnd();
     }
 
