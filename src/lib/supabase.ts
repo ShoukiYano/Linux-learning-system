@@ -521,6 +521,68 @@ export const db = {
     return { data, error };
   },
 
+  async getHelpArticleById(id: string) {
+    const { data, error } = await supabase
+      .from('help_articles')
+      .select('*')
+      .eq('id', id)
+      .single();
+    return { data, error };
+  },
+
+  async getHelpArticleVotes(userId: string) {
+    const { data, error } = await supabase
+      .from('help_article_votes')
+      .select('article_id')
+      .eq('user_id', userId);
+    return { data, error };
+  },
+
+  async toggleHelpfulVote(articleId: string, userId: string) {
+    // Check if vote already exists
+    const { data: existingVote } = await supabase
+      .from('help_article_votes')
+      .select('id')
+      .eq('article_id', articleId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const { data: article } = await supabase
+      .from('help_articles')
+      .select('helpful_count')
+      .eq('id', articleId)
+      .single();
+
+    let newCount = article?.helpful_count || 0;
+
+    if (existingVote) {
+      // Remove vote
+      await supabase
+        .from('help_article_votes')
+        .delete()
+        .eq('id', existingVote.id);
+      
+      newCount = Math.max(0, newCount - 1);
+    } else {
+      // Add vote
+      await supabase
+        .from('help_article_votes')
+        .insert([{ article_id: articleId, user_id: userId }]);
+      
+      newCount = newCount + 1;
+    }
+
+    // Update article count
+    const { data, error } = await supabase
+      .from('help_articles')
+      .update({ helpful_count: newCount })
+      .eq('id', articleId)
+      .select()
+      .single();
+
+    return { data, error, voted: !existingVote };
+  },
+
   // Q&A
   async getQAPosts() {
     const { data, error } = await supabase

@@ -35,3 +35,11 @@ coverage/
 # === OS files ===
 .DS_Store
 Thumbs.db
+
+# === documents ===
+詳細設計書*.md
+基本設計書*.md
+設計書*.md
+
+# === sql ===
+*.sql
