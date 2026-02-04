@@ -8,6 +8,7 @@ export interface User {
   avatarUrl?: string;
   role: 'user' | 'admin';
   created_at?: string;
+  last_active_at?: string;
 }
 
 export interface Mission {

@@ -49,8 +49,8 @@ export const Curriculum = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {paths.map(path => {
             const pathMissionsCount = path.missions?.length || 0;
-            const completedInPath = path.missions?.filter((mId: string) => 
-               userMissions.find(um => um.mission_id === mId && um.is_completed)
+            const completedInPath = path.missions?.filter((m: any) => 
+               userMissions.find(um => um.mission_id === m.id && um.is_completed)
             ).length || 0;
             const progress = pathMissionsCount > 0 ? (completedInPath / pathMissionsCount) * 100 : 0;
             const isCompleted = pathMissionsCount > 0 && completedInPath === pathMissionsCount;

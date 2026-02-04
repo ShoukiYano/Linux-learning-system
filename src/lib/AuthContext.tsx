@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User as AuthUser, Session } from '@supabase/supabase-js';
-import { auth, supabase } from './supabase';
+import { auth, supabase, db } from './supabase';
 import { User } from '../types';
 
 interface AuthContextType {
@@ -89,6 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else if (data) {
         setUser(data);
+        // 背景でストリークを更新し、最新状態を取得して再セット
+        db.updateStreak(userId).then((result: any) => {
+          if (result.data) setUser(result.data);
+        });
       }
     } catch (error) {
       console.error('Failed to fetch user profile:', error);

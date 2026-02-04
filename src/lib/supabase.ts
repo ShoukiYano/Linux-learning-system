@@ -78,6 +78,51 @@ export const db = {
     return { data, error };
   },
 
+  async updateStreak(userId: string) {
+    const { data: user, error: fetchError } = await this.getUser(userId);
+    if (fetchError || !user) return { error: fetchError };
+
+    const now = new Date();
+    const lastActive = user.last_active_at ? new Date(user.last_active_at) : null;
+    
+    // Normalize dates to UTC midnight for day-based comparison
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    
+    if (!lastActive) {
+      // First time activity
+      return await this.updateUser(userId, { 
+        streak: 1, 
+        last_active_at: now.toISOString() 
+      });
+    }
+
+    const lastActiveDay = new Date(Date.UTC(lastActive.getUTCFullYear(), lastActive.getUTCMonth(), lastActive.getUTCDate()));
+    
+    const diffTime = today.getTime() - lastActiveDay.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+      // Consecutive day!
+      return await this.updateUser(userId, { 
+        streak: (user.streak || 0) + 1, 
+        last_active_at: now.toISOString() 
+      });
+    } else if (diffDays > 1) {
+      // Gap found, reset
+      return await this.updateUser(userId, { 
+        streak: 1, 
+        last_active_at: now.toISOString() 
+      });
+    } else if (diffDays === 0) {
+      // Already updated today, just update last_active_at for precision
+      return await this.updateUser(userId, { 
+        last_active_at: now.toISOString() 
+      });
+    }
+
+    return { data: user, error: null };
+  },
+
   async getUsers() {
     const { data, error } = await supabase
       .from('users')
@@ -99,7 +144,8 @@ export const db = {
     const { data, error } = await supabase
       .from('missions')
       .select('*')
-      .order('order_index', { ascending: true });
+      .order('order_index', { ascending: true })
+      .order('created_at', { ascending: true });
     return { data, error };
   },
 
@@ -316,15 +362,20 @@ export const db = {
       .from('learning_paths')
       .select(`
         *,
-        path_missions (mission_id)
+        path_missions (
+          order_index,
+          missions (*)
+        )
       `)
-      .order('order_index', { ascending: true }); // Sort by order_index
+      .order('order_index', { ascending: true });
     
     const formattedData = data?.map(path => ({
       ...path,
-      name: path.title, // Align with UI expectation
-      difficulty: path.level?.toLowerCase() || 'intermediate', // For UI
-      missions: path.path_missions?.map((pm: any) => pm.mission_id) || []
+      name: path.title,
+      difficulty: path.level?.toLowerCase() || 'intermediate',
+      missions: path.path_missions
+        ?.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+        ?.map((pm: any) => pm.missions) || []
     }));
 
     return { data: formattedData, error };
