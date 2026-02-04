@@ -112,6 +112,17 @@ export const formatTimestamp = (dateStr?: string): string => {
   return `${month} ${day} ${hours}:${minutes}`;
 };
 
+// ls -l の1行分をフォーマット
+const formatLsLine = (node: FileSystemNode, opts: Set<string>): string => {
+  const size = node.type === 'directory' ? 4096 : (node.content || '').length;
+  const sizeStr = opts.has('h') 
+    ? (size > 1024 ? `${(size/1024).toFixed(1)}K` : size) 
+    : size;
+  const ts = formatTimestamp(node.updatedAt);
+  const indicator = opts.has('F') && node.type === 'directory' ? '/' : '';
+  return `${formatPermissions(node)} 1 user user ${String(sizeStr).padStart(5)} ${ts} ${node.name}${indicator}`;
+};
+
 export interface CommandResult {
   output: string;
   newFs?: FileSystemNode;
@@ -238,7 +249,9 @@ export const executeCommand = (
         let output = '';
         if (showHeader) output += `${path}:\n`;
 
-        if (node.type === 'file') return node.name;
+        if (node.type === 'file') {
+          return opts.has('l') ? formatLsLine(node, opts) : node.name;
+        }
         if (!node.children) return '';
 
         const items = Object.values(node.children).filter(child => 
@@ -246,14 +259,7 @@ export const executeCommand = (
         );
 
         if (opts.has('l')) {
-          const lines = items.map(child => {
-            const size = child.type === 'directory' ? 4096 : (child.content || '').length;
-            const sizeStr = opts.has('h') 
-              ? (size > 1024 ? `${(size/1024).toFixed(1)}K` : size) 
-              : size;
-            const ts = formatTimestamp(child.updatedAt);
-            return `${formatPermissions(child)} 1 user user ${String(sizeStr).padStart(5)} ${ts} ${child.name}${opts.has('F') && child.type === 'directory' ? '/' : ''}`;
-          });
+          const lines = items.map(child => formatLsLine(child, opts));
           output += lines.join('\n');
         } else {
           output += items.map(i => {
@@ -399,6 +405,9 @@ export const executeCommand = (
               content: '',
               updatedAt: new Date().toISOString()
             };
+          } else {
+            // Update timestamp for existing file
+            dirNode.children[name].updatedAt = new Date().toISOString();
           }
         }
       }
