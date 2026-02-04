@@ -28,6 +28,7 @@ export const Terminal: React.FC<TerminalProps> = ({
     { command: '', output: 'Welcome to L-Quest Interactive Mode!\nType "help" to see available commands.', timestamp: Date.now(), status: 'success', cwd: '/home/student' }
   ]);
   const [cwd, setCwdLocal] = useState('/home/student');
+  const [oldPwd, setOldPwd] = useState<string | undefined>(undefined);
   const [input, setInput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,6 +50,7 @@ export const Terminal: React.FC<TerminalProps> = ({
 
   // Wrapper for setCwd to also call callback
   const setCwd = (newCwd: string) => {
+    if (newCwd !== cwd) setOldPwd(cwd);
     setCwdLocal(newCwd);
   };
 
@@ -155,7 +157,8 @@ export const Terminal: React.FC<TerminalProps> = ({
         fs,
         cwd,
         (newFs: FileSystemNode) => setFs(newFs),
-        (newCwd: string) => setCwd(newCwd)
+        (newCwd: string) => setCwd(newCwd),
+        oldPwd
       );
       
       const output = result.output;

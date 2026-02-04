@@ -15,6 +15,11 @@ interface MissionStepFormData {
   validationParams: ValidationParams;
 }
 
+interface FileEntry {
+  path: string;
+  content: string;
+}
+
 interface MissionFormData {
   id?: string;
   title: string;
@@ -24,6 +29,7 @@ interface MissionFormData {
   xp: number;
   isLocked: boolean;
   steps: MissionStepFormData[];
+  initialFileSystem: FileEntry[];
 }
 
 const emptyStep: MissionStepFormData = {
@@ -42,6 +48,7 @@ const initialFormData: MissionFormData = {
   xp: 100,
   isLocked: false,
   steps: [],
+  initialFileSystem: [],
 };
 
 export const Admin = () => {
@@ -76,17 +83,33 @@ export const Admin = () => {
 
       if (editingId) {
         // Update mission
-        const { title, description, category, difficulty, xp, isLocked } = formData;
+        const { title, description, category, difficulty, xp, isLocked, initialFileSystem } = formData;
         await db.supabase
           .from('missions')
-          .update({ title, description, category, difficulty, xp, is_locked: isLocked })
+          .update({ 
+            title, 
+            description, 
+            category, 
+            difficulty, 
+            xp, 
+            is_locked: isLocked,
+            initial_filesystem: initialFileSystem // Save initial FS
+          })
           .eq('id', editingId);
       } else {
         // Create mission
-        const { title, description, category, difficulty, xp, isLocked } = formData;
+        const { title, description, category, difficulty, xp, isLocked, initialFileSystem } = formData;
         const { data } = await db.supabase
           .from('missions')
-          .insert([{ title, description, category, difficulty, xp, is_locked: isLocked }])
+          .insert([{ 
+            title, 
+            description, 
+            category, 
+            difficulty, 
+            xp, 
+            is_locked: isLocked,
+            initial_filesystem: initialFileSystem // Save initial FS
+          }])
           .select()
           .single();
         if (data) missionId = data.id;
@@ -130,6 +153,7 @@ export const Admin = () => {
       xp: mission.xp,
       isLocked: mission.is_locked || false,
       steps: formattedSteps,
+      initialFileSystem: mission.initial_filesystem || [], // Load initial FS
     });
     setEditingId(mission.id);
     setShowForm(true);
@@ -171,6 +195,25 @@ export const Admin = () => {
     [newSteps[index], newSteps[newIndex]] = [newSteps[newIndex], newSteps[index]];
     setFormData({ ...formData, steps: newSteps });
     setActiveStepIndex(newIndex);
+  };
+
+  // Initial FS management functionality
+  const addFile = () => {
+    setFormData({
+      ...formData,
+      initialFileSystem: [...formData.initialFileSystem, { path: '', content: '' }]
+    });
+  };
+
+  const removeFile = (index: number) => {
+    const newFs = formData.initialFileSystem.filter((_, i) => i !== index);
+    setFormData({ ...formData, initialFileSystem: newFs });
+  };
+
+  const updateFile = (index: number, field: keyof FileEntry, value: string) => {
+    const newFs = [...formData.initialFileSystem];
+    newFs[index] = { ...newFs[index], [field]: value };
+    setFormData({ ...formData, initialFileSystem: newFs });
   };
 
   const getValidationParamsUI = (step: MissionStepFormData, index: number) => {
@@ -411,6 +454,61 @@ export const Admin = () => {
                   />
                   <label htmlFor="isLocked" className="text-sm font-bold">ロック状態（ユーザーが実行できません）</label>
                 </div>
+              </div>
+
+              {/* Initial File System Section */}
+              <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-700">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold text-primary-400">📁 初期ファイルシステム</h3>
+                  <button
+                    type="button"
+                    onClick={addFile}
+                    className="flex items-center gap-1 bg-primary-600 hover:bg-primary-500 text-white px-3 py-1 rounded text-sm font-bold transition-colors"
+                  >
+                    <Plus size={16} /> ファイル追加
+                  </button>
+                </div>
+
+                {formData.initialFileSystem.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500">
+                    <p>初期ファイルが設定されていません。「ファイル追加」ボタンから追加できます。</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {formData.initialFileSystem.map((file, index) => (
+                      <div key={index} className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1 mr-4">
+                            <label className="block text-xs font-bold mb-1 text-slate-400">ファイルパス (例: documents/hello.txt)</label>
+                            <input
+                              type="text"
+                              value={file.path}
+                              onChange={(e) => updateFile(index, 'path', e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white font-mono"
+                              placeholder="path/to/file.txt"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(index)}
+                            className="p-2 text-red-400 hover:bg-slate-700 rounded transition-colors mt-4"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold mb-1 text-slate-400">ファイル内容</label>
+                          <textarea
+                            value={file.content}
+                            onChange={(e) => updateFile(index, 'content', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white h-24 font-mono whitespace-pre"
+                            placeholder="ファイルの中身を入力..."
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Steps Section */}

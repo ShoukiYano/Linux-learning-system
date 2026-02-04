@@ -1,7 +1,13 @@
 import { FileSystemNode } from '../types';
+export const HOME_DIR = '/home/student';
 
 // Helper to traverse the FS
 export const resolvePath = (fs: FileSystemNode, cwd: string, targetPath: string): FileSystemNode | null => {
+  // Handle home directory expansion
+  if (targetPath === '~' || targetPath.startsWith('~/')) {
+    targetPath = HOME_DIR + targetPath.slice(1);
+  }
+
   if (targetPath === '/') return fs;
   
   let searchParts: string[] = [];
@@ -41,6 +47,11 @@ export const resolvePath = (fs: FileSystemNode, cwd: string, targetPath: string)
 export const formatPermissions = (node: FileSystemNode) => node.permissions || (node.type === 'directory' ? 'drwxr-xr-x' : '-rw-r--r--');
 
 export const normalizePath = (cwd: string, relativePath: string): string => {
+  // Handle home directory expansion
+  if (relativePath === '~' || relativePath.startsWith('~/')) {
+    relativePath = HOME_DIR + relativePath.slice(1);
+  }
+
   if (relativePath.startsWith('/')) {
     return relativePath;
   }
@@ -106,7 +117,8 @@ export const executeCommand = (
   args: string[], 
   fs: FileSystemNode, 
   cwd: string,
-  stdin?: string
+  stdin?: string,
+  oldPwd?: string
 ): CommandResult => {
   
   switch (cmd) {
@@ -166,7 +178,16 @@ export const executeCommand = (
 
     case 'cd': {
       const { params: cdParams } = parseArgs(args);
-      const targetDir = cdParams[0] || '/home/student';
+      let targetDir = cdParams[0] || HOME_DIR;
+      
+      // Handle cd - (previous directory)
+      if (targetDir === '-') {
+        if (!oldPwd) return { output: 'bash: cd: OLDPWD not set' };
+        // cd - prints the new directory path
+        const result = { output: oldPwd, newCwd: oldPwd };
+        return result;
+      }
+
       const newDir = resolvePath(fs, cwd, targetDir);
       
       if (!newDir) return { output: `cd: ${targetDir}: No such file or directory` };
@@ -1134,7 +1155,8 @@ export const writeFile = (
   root: FileSystemNode,
   cwd: string,
   filePath: string,
-  content: string
+  content: string,
+  createParents: boolean = false
 ): FileSystemNode => {
   const newFs = JSON.parse(JSON.stringify(root));
   
@@ -1161,9 +1183,19 @@ export const writeFile = (
   let current = newFs;
   for (const part of normalizedParts) {
     if (!current.children || !current.children[part]) {
-      // 親ディレクトリが存在しない場合はエラー（mkdir -p的な動作はしない）
-      // あるいは自動作成するかどうか。今回は自動作成しない（Linuxの挙動に合わせる）
-      return root; 
+      if (createParents) {
+        // 親ディレクトリを作成
+        if (!current.children) current.children = {};
+        current.children[part] = {
+          type: 'directory',
+          name: part,
+          children: {},
+          permissions: 'rwxr-xr-x'
+        };
+      } else {
+        // 親ディレクトリが存在しない場合はエラー
+        return root; 
+      }
     }
     current = current.children[part];
     if (current.type !== 'directory') return root; // 途中にファイルがある
@@ -1224,7 +1256,8 @@ export const executeCommandLine = (
   fs: FileSystemNode,
   cwd: string,
   onFsChange: (fs: FileSystemNode) => void,
-  onCwdChange: (cwd: string) => void
+  onCwdChange: (cwd: string) => void,
+  oldPwd?: string
 ): CommandResult => {
   // Manual scanner to split by pipes while respecting quotes and full-width characters
   const stages: string[] = [];
@@ -1266,7 +1299,7 @@ export const executeCommandLine = (
     const cmd = tokens[0];
     const args = tokens.slice(1);
 
-    const result = executeCommand(cmd, args, currentFs, currentCwd, i > 0 ? lastOutput : undefined);
+    const result = executeCommand(cmd, args, currentFs, currentCwd, i > 0 ? lastOutput : undefined, oldPwd);
 
     if (result.newFs) {
         currentFs = result.newFs;

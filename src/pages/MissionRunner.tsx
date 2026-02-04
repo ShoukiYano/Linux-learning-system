@@ -94,6 +94,7 @@ interface MissionData {
   difficulty: string;
   xp: number;
   steps: MissionStep[];
+  initialFileSystem?: any; // JSONB from DB
 }
 
 export const MissionRunner = () => {
@@ -104,14 +105,8 @@ export const MissionRunner = () => {
   const [mission, setMission] = useState<MissionData | null>(null);
   const [loadingMission, setLoadingMission] = useState(true);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [fs, setFs] = useState<FileSystemNode>(() => {
-    // 初期化時にLocalStorageから読み込み
-    const savedFs = localStorage.getItem('lquest_fs');
-    return savedFs ? JSON.parse(savedFs) : JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM));
-  });
-  const [cwd, setCwd] = useState(() => {
-    return localStorage.getItem('lquest_cwd') || '/home/student';
-  });
+  const [fs, setFs] = useState<FileSystemNode>(INITIAL_FILE_SYSTEM); // Initial state, will be updated in useEffect
+  const [cwd, setCwd] = useState('/home/student'); // Initial state
   const [commandLog, setCommandLog] = useState<CommandHistory[]>([]);
   const [showHint, setShowHint] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -164,6 +159,7 @@ export const MissionRunner = () => {
             difficulty: dbMission.difficulty,
             xp: dbMission.xp,
             steps: formattedSteps,
+            initialFileSystem: dbMission.initial_filesystem // DBから読み込んだ初期FS
           });
         }
       } else {
@@ -186,17 +182,68 @@ export const MissionRunner = () => {
     };
 
     loadMission();
+    loadMission();
   }, [id]);
 
-  // データ永続化: fs または cwd が変更されたら保存
+  // Mission ID変更時、またはミッションロード完了時にFS/CWDを初期化
   useEffect(() => {
+    if (!mission || loadingMission) return;
+    
+    const missionId = mission.id;
+    const storageKeyFs = `lquest_fs_${missionId}`;
+    const storageKeyCwd = `lquest_cwd_${missionId}`;
+
+    const savedFs = localStorage.getItem(storageKeyFs);
+    const savedCwd = localStorage.getItem(storageKeyCwd);
+
+    if (savedFs) {
+      setFs(JSON.parse(savedFs));
+    } else {
+      // 初期FSの構築: INITIAL_FILE_SYSTEM をベースに、mission.initialFileSystem があればマージ/上書き
+      let initialFs = JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM));
+      
+      if (mission.initialFileSystem) {
+         // ここでマージロジック (簡易的に上書き、または特定のパスに配置)
+         // コンテンツの型は { path: string, content: string }[] を想定
+         // TODO: 実際のデータ構造に合わせて実装。一旦は仮実装。
+         // 今回は単純なJSONツリーが渡ってくると仮定するか、
+         // Admin側で構築した { path: string, content: string }[] のリストを受け取って展開するか。
+         // ここでは Admin側で { path: string, content: string }[] を保存すると仮定し、それを適用するヘルパーを使う。
+         
+         // 循環参照回避のため、utilsなどで定義した関数を使いたいが、ここで簡易展開
+         // (resolvePath, writeFile は使える)
+         // mission.initialFileSystem は any型 (DBのJSONB)
+         if (Array.isArray(mission.initialFileSystem)) {
+             mission.initialFileSystem.forEach((file: { path: string, content: string }) => {
+                 initialFs = writeFile(initialFs, '/', file.path, file.content, true);
+             });
+         }
+      }
+      setFs(initialFs);
+    }
+
+    if (savedCwd) {
+      setCwd(savedCwd);
+    } else {
+      setCwd('/home/student');
+    }
+  }, [mission?.id, loadingMission]);
+
+  // データ永続化: fs または cwd が変更されたら保存 (Mission IDをキーにする)
+  useEffect(() => {
+    if (!mission) return;
+    
+    const missionId = mission.id;
+    const storageKeyFs = `lquest_fs_${missionId}`;
+    const storageKeyCwd = `lquest_cwd_${missionId}`;
+
     // デバウンス処理（頻繁な書き込み防止）
     const timer = setTimeout(() => {
-      localStorage.setItem('lquest_fs', JSON.stringify(fs));
-      localStorage.setItem('lquest_cwd', cwd);
+      localStorage.setItem(storageKeyFs, JSON.stringify(fs));
+      localStorage.setItem(storageKeyCwd, cwd);
     }, 500);
     return () => clearTimeout(timer);
-  }, [fs, cwd]);
+  }, [fs, cwd, mission?.id]);
 
   const currentStep = mission?.steps[currentStepIndex];
 
@@ -284,15 +331,26 @@ export const MissionRunner = () => {
   };
 
   const resetMission = () => {
+    if (!mission) return;
     setCurrentStepIndex(0);
-    setFs(JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM)));
+    
+    // 初期FSの再構築
+    let initialFs = JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM));
+    if (mission.initialFileSystem && Array.isArray(mission.initialFileSystem)) {
+        mission.initialFileSystem.forEach((file: { path: string, content: string }) => {
+            initialFs = writeFile(initialFs, '/', file.path, file.content, true);
+        });
+    }
+    setFs(initialFs);
+    
     setCommandLog([]);
     setShowHint(false);
     setCwd('/home/student');
     setStartTime(Date.now());
-    // LocalStorageもクリア
-    localStorage.removeItem('lquest_fs');
-    localStorage.removeItem('lquest_cwd');
+    
+    // Mission specific LocalStorage clear
+    localStorage.removeItem(`lquest_fs_${mission.id}`);
+    localStorage.removeItem(`lquest_cwd_${mission.id}`);
   };
 
   const handleNanoSave = (content: string) => {
@@ -580,9 +638,9 @@ export const MissionRunner = () => {
                               Last modified: just now
                             </div>
                             {file.content && (
-                              <div className="bg-slate-800/50 p-2 rounded text-xs truncate">
-                                <span className="text-slate-500">内容: </span>
-                                <span className="text-green-400">"{file.content}"</span>
+                              <div className="bg-slate-800/50 p-2 rounded text-xs whitespace-pre-wrap break-words max-h-64 overflow-y-auto font-mono">
+                                <div className="text-slate-500 mb-1">内容:</div>
+                                <div className="text-green-400">{file.content}</div>
                               </div>
                             )}
                           </div>
