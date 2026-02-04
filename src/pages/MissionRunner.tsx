@@ -114,6 +114,7 @@ export const MissionRunner = () => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [activeTab, setActiveTab] = useState<'guide' | 'files'>('guide');
   const [startTime, setStartTime] = useState<number>(Date.now());
+  const [resetKey, setResetKey] = useState(0);
   
   // Nano Editor State
   const [showNano, setShowNano] = useState(false);
@@ -248,8 +249,17 @@ export const MissionRunner = () => {
       if (result.stdinContent !== undefined) {
           content = result.stdinContent;
       } else {
-          // ファイル内容の読み込み
-          const node = resolvePath(fs, cwd, filename);
+      // ファイル内容の読み込み
+          let node = resolvePath(fs, cwd, filename);
+
+          // Fallback: resolvePathが失敗した場合、カレントディレクトリ直下を直接確認する
+          if (!node && !filename.includes('/')) {
+             const currentDir = resolvePath(fs, cwd, '.');
+             if (currentDir && currentDir.children && currentDir.children[filename]) {
+                 node = currentDir.children[filename];
+             }
+          }
+
           // 新規ファイルなら空、既存ならその内容
           content = node && node.type === 'file' ? node.content || '' : '';
       }
@@ -338,6 +348,7 @@ export const MissionRunner = () => {
     setShowHint(false);
     setCwd('/home/student');
     setStartTime(Date.now());
+    setResetKey(prev => prev + 1);
     
     // Mission specific LocalStorage clear
     localStorage.removeItem(`lquest_fs_${mission.id}`);
@@ -564,6 +575,7 @@ export const MissionRunner = () => {
             {/* Terminal */}
             <div className="flex-1 border-r border-slate-200 dark:border-slate-700 overflow-hidden relative">
               <Terminal 
+                key={`${mission.id}-${resetKey}`}
                 fs={fs}
                 setFs={setFs}
                 onCommand={handleCommand} 

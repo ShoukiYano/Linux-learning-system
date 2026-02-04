@@ -748,20 +748,16 @@ export const executeCommand = (
 
       const newFs = JSON.parse(JSON.stringify(fs));
       let targetPath = fileName;
-      let initialContent = '';
+      let initialContent: string | undefined = undefined;
 
       if (stdin !== undefined) {
         initialContent = stdin;
         if (!fileName) {
-          // If no filename is provided but stdin is, create a temporary file
-          // In a real shell, this might open a buffer, but for this simulation,
-          // we'll indicate it's stdin content.
           targetPath = '__NANO_STDIN__'; // Special marker for stdin content
         }
       }
 
       if (targetPath === '__NANO_STDIN__') {
-        // For stdin content, we don't check the FS for existence, just pass the content
         return { output: `__NANO__${targetPath}`, newFs, stdinContent: initialContent };
       } else {
         const node = resolvePath(newFs, cwd, targetPath);
@@ -860,7 +856,7 @@ export const executeCommand = (
     }
 
     case 'chmod': {
-      // 簡易実装（パーミッション文字列の変更のみ）
+      // 簡易実装（パーミッション文字列の変更）
       const { params: chmodParams } = parseArgs(args);
       if (chmodParams.length < 2) return { output: 'chmod: missing operand' };
       
@@ -870,15 +866,78 @@ export const executeCommand = (
       const nodeChmod = resolvePath(newFsChmod, cwd, target);
       
       if (nodeChmod) {
-        // 数値モード(755等)や+x等は複雑なので、ここでは単純に文字列を上書きするか、
-        // 755 -> drwxr-xr-x 変換のような簡易ロジックを入れる
-        if (mode === '755') nodeChmod.permissions = nodeChmod.type === 'directory' ? 'drwxr-xr-x' : '-rwxr-xr-x';
-        else if (mode === '644') nodeChmod.permissions = '-rw-r--r--';
-        else if (mode === '777') nodeChmod.permissions = nodeChmod.type === 'directory' ? 'drwxrwxrwx' : '-rwxrwxrwx';
-        else if (mode === '700') nodeChmod.permissions = nodeChmod.type === 'directory' ? 'drwx------' : '-rwx------';
-        else if (mode === '600') nodeChmod.permissions = nodeChmod.type === 'directory' ? 'drwx------' : '-rwx------';
-        else if (mode === '+x') nodeChmod.permissions = nodeChmod.permissions?.replace(/-/g, 'x') || '-rwxr-xr-x';
-        else nodeChmod.permissions = mode; // Fallback
+        let currentPerms = nodeChmod.permissions || (nodeChmod.type === 'directory' ? 'drwxr-xr-x' : '-rw-r--r--');
+        const isDir = nodeChmod.type === 'directory';
+
+        // Helper to parse individual permission char (r, w, x, -)
+        const parsePermChar = (char: string, type: 'r' | 'w' | 'x') => {
+            return char === type ? true : false;
+        };
+
+        // Convert rwxrwxrwx string to object like { user: {r:true, w:true, x:true}, group: ... }
+        // Format: d rwx rwx rwx (10 chars, index 1-3, 4-6, 7-9)
+        const parsePermString = (p: string) => {
+            return {
+                user: { r: p[1]==='r', w: p[2]==='w', x: p[3]==='x' },
+                group: { r: p[4]==='r', w: p[5]==='w', x: p[6]==='x' },
+                other: { r: p[7]==='r', w: p[8]==='w', x: p[9]==='x' }
+            };
+        };
+
+        const renderPermString = (pObj: any, isDir: boolean) => {
+            const r = (o: any) => `${o.r?'r':'-'}${o.w?'w':'-'}${o.x?'x':'-'}`;
+            return `${isDir?'d':'-'}${r(pObj.user)}${r(pObj.group)}${r(pObj.other)}`;
+        };
+
+        if (/^[0-7]{3}$/.test(mode)) {
+            // Octal mode (e.g., 755)
+            const map = {
+                '0': '---', '1': '--x', '2': '-w-', '3': '-wx',
+                '4': 'r--', '5': 'r-x', '6': 'rw-', '7': 'rwx'
+            };
+            const u = map[mode[0] as keyof typeof map];
+            const g = map[mode[1] as keyof typeof map];
+            const o = map[mode[2] as keyof typeof map];
+            nodeChmod.permissions = `${isDir?'d':'-'}${u}${g}${o}`;
+        } else if (/^[ugo]*[+\-=][rwx]+$/.test(mode)) {
+            // Symbolic mode (simple support: u+x, go-w, +r, etc.)
+            // Split into [who, op, what]
+            const match = mode.match(/^([ugo]*)([+\-=])([rwx]+)$/);
+            if (match) {
+                const who = match[1] || 'ugo'; // empty means all
+                const op = match[2];
+                const what = match[3];
+
+                const pObj = parsePermString(currentPerms);
+
+                const apply = (target: any) => {
+                    for (const char of what) {
+                        if (char === 'r') target.r = (op === '+' || op === '=');
+                        if (char === 'w') target.w = (op === '+' || op === '=');
+                        if (char === 'x') target.x = (op === '+' || op === '=');
+                        
+                        if (op === '-') {
+                             if (char === 'r') target.r = false;
+                             if (char === 'w') target.w = false;
+                             if (char === 'x') target.x = false;
+                        }
+                    }
+                };
+
+                if (who.includes('u')) apply(pObj.user);
+                if (who.includes('g')) apply(pObj.group);
+                if (who.includes('o')) apply(pObj.other);
+                if (who === 'ugo' && who.length === 0) { // Should not happen with || logic but effectively 'a'
+                     apply(pObj.user); apply(pObj.group); apply(pObj.other);
+                }
+
+                nodeChmod.permissions = renderPermString(pObj, isDir);
+            }
+        } else {
+             // Fallback or specific hardcoded cases from existing logic
+             if (mode === '+x') nodeChmod.permissions = currentPerms.replace(/-/g, 'x'); // Legacy fallback
+             else return { output: `chmod: invalid mode: '${mode}'` };
+        }
         
         return { output: '', newFs: newFsChmod };
       } else {
@@ -1095,7 +1154,20 @@ export const executeCommand = (
       }
       
       const lines = content.split('\n').filter(l => l);
-      lines.sort();
+
+      // Handle numeric sort (-n)
+      if (opts.has('n')) {
+          lines.sort((a, b) => {
+              const numA = parseFloat(a.replace(/[^\d.-]/g, ''));
+              const numB = parseFloat(b.replace(/[^\d.-]/g, ''));
+              if (isNaN(numA)) return 1;
+              if (isNaN(numB)) return -1;
+              return numA - numB;
+          });
+      } else {
+          lines.sort();
+      }
+
       if (opts.has('r')) lines.reverse();
       
       return { output: lines.join('\n') };
@@ -1192,13 +1264,140 @@ export const executeCommand = (
     }
 
     case 'df':
-      return { output: 'Filesystem     1K-blocks      Used Available Use% Mounted on\n/dev/sda1       10485760   1234567   9251193  12% /' };
+      return { output: 'Filesystem     1K-blocks      Used Available Use% Mounted on\n/dev/sda1       20971520   4512340  16459180  22% /' };
 
-    case 'ps':
-      return { output: '  PID TTY          TIME CMD\n 1001 pts/0    00:00:00 bash\n 1002 pts/0    00:00:00 ps' };
+    case 'ps': {
+      // More realistic mock processes including ones from missions
+      const { params } = parseArgs(args); // Supports ps aux (ignored but valid)
+      return { output: 
+`USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.1  16840  9476 ?        Ss   10:00   0:01 /sbin/init
+root           2  0.0  0.0      0     0 ?        S    10:00   0:00 [kthreadd]
+root         345  0.1  0.5 156320  8420 ?        Ss   10:01   0:05 /usr/sbin/syslogd
+root         420  0.0  0.3  72300  4500 ?        Ss   10:01   0:00 /usr/sbin/sshd -D
+nginx        880  0.0  0.4  55200  6200 ?        Ss   10:02   0:00 nginx: master process /usr/sbin/nginx
+nginx        881  0.0  0.2  55600  4100 ?        S    10:02   0:00 nginx: worker process
+student     1001  0.2  0.8  22400  5600 pts/0    Ss   10:05   0:00 -bash
+student     1234  99.9 0.1   8400  1200 ?        R    11:00  20:00 python3 loop_script.py
+student     ${Math.floor(Math.random() * 1000) + 2000}  0.0  0.1   9200  3200 pts/0    R+   12:00   0:00 ps aux`
+      };
+    }
 
-    case 'kill':
-      return { output: '' };
+    case 'sudo': {
+        // Simple simulation: just shift the args and run (maybe with a fake "password" prompt in future?)
+        // For now, implicit success.
+        // It should ideally check if user is root, but we assume student can sudo.
+        const { params } = parseArgs(args);
+        if (params.length === 0) return { output: 'usage: sudo command' };
+        
+        const subCmd = params[0];
+        const subArgs = params.slice(1);
+        
+        // Execute sub command
+        // Note: Recursive call logic needs to be careful not to infinite loop if "sudo sudo"
+        // And we need to pass the fs/cwd context
+        // But wait, executeCommand doesn't take 'raw command string' but parts.
+        // We can just call executeCommand recursively.
+        
+        // If the command is restricted, we could allow it here. 
+        // For simulation, 'sudo' essentially does nothing special other than maybe logging or allowing permissions (if we tracked file ownership strictly).
+        // Since our file ownership model is loose (everything owned by user usually, or read-only if root), we can just execute.
+        
+        // If the target is a system file owned by root, naive write might fail in a real permission logic, 
+        // but here our writeFile doesn't strictly enforce user ownership checks yet (permissions are strings).
+        // Let's just run it.
+        
+        return executeCommand(subCmd, subArgs, fs, cwd, stdin, oldPwd, history);
+    }
+    
+    case 'uptime': {
+        return { output: ' 12:34:56 up 2 days, 4:20,  1 user,  load average: 0.05, 0.03, 0.01' };
+    }
+    
+    case 'free': {
+        const { options } = parseArgs(args);
+        const opts = parseOptions(options);
+        if (opts.has('h')) {
+            return { output: 
+`              total        used        free      shared  buff/cache   available
+Mem:           7.8G        1.2G        4.5G        120M        2.1G        6.3G
+Swap:          2.0G          0B        2.0G` };
+        }
+        return { output: 
+`              total        used        free      shared  buff/cache   available
+Mem:        8192000     1258291     4718592      122880     2215117     6606029
+Swap:       2097152           0     2097152` };
+    }
+    
+    case 'uname': {
+        const { options } = parseArgs(args);
+        const opts = parseOptions(options);
+        if (opts.has('a')) return { output: 'Linux l-quest-svr 5.15.0-100-generic #110-Ubuntu SMP Tue Jan 1 10:00:00 UTC 2024 x86_64 x86_64 x86_64 GNU/Linux' };
+        if (opts.has('r')) return { output: '5.15.0-100-generic' };
+        return { output: 'Linux' };
+    }
+    
+    case 'top': {
+        return { output: 
+`top - 12:40:00 up 2 days,  4:25,  1 user,  load average: 0.02, 0.02, 0.00
+Tasks:  95 total,   1 running,  94 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  0.5 us,  0.2 sy,  0.0 ni, 99.3 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+MiB Mem :   7950.0 total,   4600.0 free,   1200.0 used,   2150.0 buff/cache
+MiB Swap:   2048.0 total,   2048.0 free,      0.0 used.   6450.0 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   1234 student   20   0    8400   1200    900 R  99.9   0.0  20:05.12 loop_script.py
+    880 nginx     20   0   55200   6200   2500 S   0.0   0.1   0:00.05 nginx
+      1 root      20   0  168400   9400   6800 S   0.0   0.1   0:01.23 systemd
+   1001 student   20   0   22400   5600   3400 S   0.0   0.1   0:00.15 bash
+    Note: Press 'q' to exit.` };
+    }
+    
+    case 'id': {
+        const { params } = parseArgs(args);
+        const targetUser = params[0] || 'student';
+        if (targetUser === 'root') return { output: 'uid=0(root) gid=0(root) groups=0(root)' };
+        if (targetUser === 'student') return { output: 'uid=1000(student) gid=1000(student) groups=1000(student),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev)' };
+        return { output: `id: '${targetUser}': no such user` };
+    }
+    
+    case 'groups': {
+        return { output: 'student adm cdrom sudo dip plugdev' };
+    }
+    
+    case 'pkill': {
+        // Simulation: "killed"
+        const { params } = parseArgs(args);
+        if (params.length === 0) return { output: 'pkill: missing operand' };
+        return { output: '' };
+    }
+    
+    case 'systemctl': {
+        const { params } = parseArgs(args);
+        if (params.length < 2) return { output: 'systemctl: missing operand' };
+        const op = params[0];
+        const svc = params[1];
+        
+        if (op === 'status') {
+            const running = svc === 'nginx' || svc === 'ssh';
+            return { output: 
+`● ${svc}.service - ${svc} service
+     Loaded: loaded (/lib/systemd/system/${svc}.service; enabled; vendor preset: enabled)
+     Active: ${running ? 'active (running)' : 'inactive (dead)'} since Tue 2024-01-01 10:00:00 UTC; 2h ago
+   Main PID: 1234 (${svc})
+      Tasks: 2 (limit: 1000)
+     Memory: 5.0M
+        CPU: 10ms
+     CGroup: /system.slice/${svc}.service
+             └─1234 /usr/sbin/${svc}` };
+        }
+        // start, stop, restart, reload, enable, disable
+        if (['start', 'stop', 'restart', 'reload', 'enable', 'disable'].includes(op)) {
+            // Simulate action (implicit success)
+            return { output: '' }; 
+        }
+        return { output: `Unknown operation '${op}'.` };
+    }
 
     case 'basename': {
       const { params } = parseArgs(args);

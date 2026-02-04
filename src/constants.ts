@@ -15,6 +15,32 @@ export const INITIAL_FILE_SYSTEM: FileSystemNode = {
   type: 'directory',
   permissions: 'drwxr-xr-x',
   children: {
+    'bin': {
+      name: 'bin',
+      type: 'directory',
+      permissions: 'drwxr-xr-x',
+      children: {
+        'bash': { name: 'bash', type: 'file', permissions: '-rwxr-xr-x', content: '' },
+        'ls': { name: 'ls', type: 'file', permissions: '-rwxr-xr-x', content: '' },
+        'cp': { name: 'cp', type: 'file', permissions: '-rwxr-xr-x', content: '' },
+        'mv': { name: 'mv', type: 'file', permissions: '-rwxr-xr-x', content: '' },
+        'rm': { name: 'rm', type: 'file', permissions: '-rwxr-xr-x', content: '' },
+        'cat': { name: 'cat', type: 'file', permissions: '-rwxr-xr-x', content: '' }
+      }
+    },
+    'etc': {
+      name: 'etc',
+      type: 'directory',
+      permissions: 'drwxr-xr-x',
+      children: {
+        'passwd': { name: 'passwd', type: 'file', permissions: '-rw-r--r--', content: 'root:x:0:0:root:/root:/bin/bash\nstudent:x:1000:1000:Student:/home/student:/bin/bash' },
+        'group': { name: 'group', type: 'file', permissions: '-rw-r--r--', content: 'root:x:0:\nstudent:x:1000:' },
+        'os-release': { name: 'os-release', type: 'file', permissions: '-rw-r--r--', content: 'NAME="L-Quest Linux"\nVERSION="1.0"\nID=lquest\nPRETTY_NAME="L-Quest Linux 1.0"' },
+        'shadow': { name: 'shadow', type: 'file', permissions: '-rw-r-----', content: 'root:$6$...\nstudent:$6$...' },
+        'hostname': { name: 'hostname', type: 'file', permissions: '-rw-r--r--', content: 'l-quest-svr' },
+        'hosts': { name: 'hosts', type: 'file', permissions: '-rw-r--r--', content: '127.0.0.1\tlocalhost' }
+      }
+    },
     'home': {
       name: 'home',
       type: 'directory',
@@ -32,8 +58,75 @@ export const INITIAL_FILE_SYSTEM: FileSystemNode = {
               children: {
                 'notes.txt': { name: 'notes.txt', type: 'file', content: 'Linux is awesome.', permissions: '-rw-r--r--' }
               }
-            },
-            'secret_file.txt': { name: 'secret_file.txt', type: 'file', content: 'Top Secret', permissions: '-rw-r--r--' }
+            }
+          }
+        }
+      }
+    },
+    'root': {
+      name: 'root',
+      type: 'directory',
+      permissions: 'drwx------',
+      children: {}
+    },
+    'tmp': {
+      name: 'tmp',
+      type: 'directory',
+      permissions: 'drwxrwxrwt',
+      children: {}
+    },
+    'usr': {
+      name: 'usr',
+      type: 'directory',
+      permissions: 'drwxr-xr-x',
+      children: {
+        'bin': {
+          name: 'bin',
+          type: 'directory',
+          permissions: 'drwxr-xr-x',
+          children: {
+            'python3': { name: 'python3', type: 'file', permissions: '-rwxr-xr-x', content: '' }
+          }
+        },
+        'lib': { name: 'lib', type: 'directory', permissions: 'drwxr-xr-x', children: {} },
+        'local': {
+            name: 'local',
+            type: 'directory',
+            permissions: 'drwxr-xr-x',
+            children: {
+                'bin': { name: 'bin', type: 'directory', permissions: 'drwxr-xr-x', children: {} }
+            }
+        },
+        'share': { name: 'share', type: 'directory', permissions: 'drwxr-xr-x', children: {} }
+      }
+    },
+    'var': {
+      name: 'var',
+      type: 'directory',
+      permissions: 'drwxr-xr-x',
+      children: {
+        'log': {
+          name: 'log',
+          type: 'directory',
+          permissions: 'drwxr-xr-x',
+          children: {
+            'syslog': { name: 'syslog', type: 'file', permissions: '-rw-r-----', content: 'May 10 10:00:01 l-quest systemd[1]: Started Session 1 of user student.' },
+            'auth.log': { name: 'auth.log', type: 'file', permissions: '-rw-r-----', content: 'May 10 10:00:00 l-quest sshd[1234]: Accepted publickey for student' }
+          }
+        },
+        'www': {
+          name: 'www',
+          type: 'directory',
+          permissions: 'drwxr-xr-x',
+          children: {
+            'html': {
+               name: 'html',
+               type: 'directory',
+               permissions: 'drwxr-xr-x',
+               children: {
+                   'index.html': { name: 'index.html', type: 'file', permissions: '-rw-r--r--', content: '<html><body>Welcome to L-Quest!</body></html>' }
+               }
+            }
           }
         }
       }
