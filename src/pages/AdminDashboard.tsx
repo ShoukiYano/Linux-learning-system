@@ -315,16 +315,21 @@ export const AdminDashboard = () => {
                     {stats.recentActivities.map((a: any) => (
                       <tr key={a.id} className="hover:bg-slate-700/20 transition-colors">
                         <td className="px-6 py-4 text-slate-400 font-mono text-xs">
-                          {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
                         <td className="px-6 py-4 font-medium text-slate-200">{a.users?.name || 'Unknown'}</td>
                         <td className="px-6 py-4">
-                          <span className={clsx(
-                            "px-2 py-0.5 rounded-full text-[10px] font-bold",
-                            a.type === 'command_execution' ? "bg-primary-500/10 text-primary-400" : "bg-blue-500/10 text-blue-400"
-                          )}>
-                            {a.type.replace('_', ' ').toUpperCase()}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className={clsx(
+                              "px-2 py-0.5 rounded-full text-[10px] font-bold w-fit",
+                              a.type === 'command_execution' ? "bg-primary-500/10 text-primary-400" : "bg-blue-500/10 text-blue-400"
+                            )}>
+                              {a.type.replace('_', ' ').toUpperCase()}
+                            </span>
+                            <span className="text-xs text-slate-400 line-clamp-1">
+                              {a.description || (a.type === 'command_execution' ? a.command : a.mission_id)}
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     ))}
