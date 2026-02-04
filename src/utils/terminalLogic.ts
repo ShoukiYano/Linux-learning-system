@@ -107,8 +107,8 @@ export interface CommandResult {
 
 // Helper to separate options from arguments
 export const parseArgs = (inputArgs: string[]) => {
-  const options = inputArgs.filter(arg => arg.startsWith('-'));
-  const params = inputArgs.filter(arg => !arg.startsWith('-'));
+  const options = inputArgs.filter(arg => arg.startsWith('-') && arg.length > 1);
+  const params = inputArgs.filter(arg => !arg.startsWith('-') || arg === '-');
   return { options, params };
 };
 
