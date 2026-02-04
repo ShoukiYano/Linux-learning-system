@@ -98,6 +98,22 @@ interface MissionData {
   initialFileSystem?: any; // JSONB from DB
 }
 
+// 共通の初期FS構築ロジック
+const reconstructFs = (initialFileSystem: any[] | undefined) => {
+  let initialFs = JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM));
+  if (initialFileSystem && Array.isArray(initialFileSystem)) {
+    initialFileSystem.forEach((file: { path: string, content: string, type?: 'file' | 'directory' }) => {
+      const resolvedType = file.type || (file.content ? 'file' : 'directory');
+      if (resolvedType === 'directory') {
+        initialFs = createDirectory(initialFs, '/', file.path, true);
+      } else {
+        initialFs = writeFile(initialFs, '/', file.path, file.content, true);
+      }
+    });
+  }
+  return initialFs;
+};
+
 export const MissionRunner = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -201,24 +217,7 @@ export const MissionRunner = () => {
     if (savedFs) {
       setFs(JSON.parse(savedFs));
     } else {
-      // 初期FSの構築: INITIAL_FILE_SYSTEM をベースに、mission.initialFileSystem があればマージ/上書き
-      let initialFs = JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM));
-      
-      if (mission.initialFileSystem) {
-         if (Array.isArray(mission.initialFileSystem)) {
-             mission.initialFileSystem.forEach((file: { path: string, content: string, type?: 'file' | 'directory' }) => {
-                 // typeが指定されていない場合のフォールバック: 内容があればファイル、なければディレクトリとみなす
-                 const resolvedType = file.type || (file.content ? 'file' : 'directory');
-                 
-                 if (resolvedType === 'directory') {
-                     initialFs = createDirectory(initialFs, '/', file.path, true);
-                 } else {
-                     initialFs = writeFile(initialFs, '/', file.path, file.content, true);
-                 }
-             });
-         }
-      }
-      setFs(initialFs);
+      setFs(reconstructFs(mission.initialFileSystem));
     }
 
     if (savedCwd) {
@@ -343,13 +342,7 @@ export const MissionRunner = () => {
     setCurrentStepIndex(0);
     
     // 初期FSの再構築
-    let initialFs = JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM));
-    if (mission.initialFileSystem && Array.isArray(mission.initialFileSystem)) {
-        mission.initialFileSystem.forEach((file: { path: string, content: string }) => {
-            initialFs = writeFile(initialFs, '/', file.path, file.content, true);
-        });
-    }
-    setFs(initialFs);
+    setFs(reconstructFs(mission.initialFileSystem));
     
     setCommandLog([]);
     setShowHint(false);
