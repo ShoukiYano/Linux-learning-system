@@ -228,9 +228,9 @@ export const Terminal: React.FC<TerminalProps> = ({
       
       {history.map((entry, i) => (
         <div key={i} className="mb-2">
-          {entry.command && (
-            <div className="flex gap-2">
-              <span className="text-primary-500 font-bold">student@l-quest:{entry.cwd}$</span>
+          {entry.command !== undefined && (
+            <div className="flex gap-2 flex-nowrap">
+              <span className="text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{entry.cwd}$</span>
               <span className="text-slate-100">{entry.command}</span>
             </div>
           )}
@@ -245,8 +245,8 @@ export const Terminal: React.FC<TerminalProps> = ({
         </div>
       ))}
 
-      <div className="flex gap-2 items-center">
-        <span className="text-primary-500 font-bold">student@l-quest:{cwd}$</span>
+      <div className="flex gap-2 items-center flex-nowrap">
+        <span className="text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{cwd}$</span>
         <input
           ref={inputRef}
           type="text"

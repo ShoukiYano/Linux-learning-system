@@ -72,6 +72,10 @@ const formatFileSize = (content: string | undefined): string => {
   return `${bytes} bytes`;
 };
 
+import { TutorialOverlay, TutorialStep } from '../components/TutorialOverlay';
+
+// ... (existing imports)
+
 export const Demo = () => {
   const [commands, setCommands] = useState<CommandEntry[]>([]);
   const [input, setInput] = useState('');
@@ -93,6 +97,74 @@ export const Demo = () => {
   const [nanoFile, setNanoFile] = useState('');
   const [nanoContent, setNanoContent] = useState('');
 
+  // Tutorial State
+  const [showTutorial, setShowTutorial] = useState(true);
+  const [tutorialStep, setTutorialStep] = useState(0);
+
+  const TUTORIAL_STEPS: TutorialStep[] = [
+    {
+      title: 'ようこそ L-Quest デモへ！',
+      description: 'ここでは、コマンド操作とそれがシステムに与える影響を完全に同期して体験できます。「黒い画面」が実際に何をしているのか、目で見て確かめましょう。',
+      position: 'center'
+    },
+    {
+      targetId: 'demo-terminal',
+      title: 'コマンドターミナル',
+      description: 'ここにコマンドを入力します。コンピューターへの「命令」を書く場所です。プロのエンジニアもここからすべてを操作します。',
+      position: 'right'
+    },
+    {
+      targetId: 'demo-file-manager',
+      title: 'ファイルマネージャー (GUI)',
+      description: 'みんなが普段使っている「フォルダ」の画面です。ターミナルでの操作結果が、ここにリアルタイムで反映されます。',
+      position: 'left'
+    },
+    {
+      targetId: 'demo-terminal',
+      title: '実際にやってみましょう',
+      description: '例えば「mkdir demo」と打つと、フォルダが作られます。自動で入力してみますね！',
+      position: 'right'
+    },
+    {
+      title: '準備完了！',
+      description: 'さあ、あなたの番です。下の「試してみるコマンド」をクリックするか、自分で好きなコマンドを打ってみてください！',
+      position: 'center'
+    }
+  ];
+
+  // Auto-typing effect for tutorial
+  useEffect(() => {
+    if (showTutorial && tutorialStep === 3) {
+      const textToType = 'mkdir demo_project';
+      let index = 0;
+      setInput('');
+      
+      const typeInterval = setInterval(() => {
+        if (index < textToType.length) {
+          setInput(prev => prev + textToType.charAt(index));
+          index++;
+        } else {
+          clearInterval(typeInterval);
+          // Wait a bit then execute
+          setTimeout(() => {
+             handleCommand('mkdir demo_project', 'チュートリアル: フォルダを作成');
+             setTimeout(() => setTutorialStep(prev => prev + 1), 1500);
+          }, 800);
+        }
+      }, 100);
+
+      return () => clearInterval(typeInterval);
+    }
+  }, [showTutorial, tutorialStep]);
+
+  const handleTutorialNext = () => {
+    if (tutorialStep < TUTORIAL_STEPS.length - 1) {
+      setTutorialStep(prev => prev + 1);
+    } else {
+      setShowTutorial(false);
+    }
+  };
+
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
@@ -112,7 +184,12 @@ export const Demo = () => {
   const handleCommand = (cmd: string, comment?: string) => {
     if (isExecuting) return;
     const trimmed = cmd.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      const timestamp = new Date().toLocaleTimeString('ja-JP');
+      setCommands(prev => [...prev, { command: '', output: '', time: timestamp, comment }]);
+      setInput('');
+      return;
+    }
 
     const timestamp = new Date().toLocaleTimeString('ja-JP');
 
@@ -224,6 +301,8 @@ export const Demo = () => {
     // LocalStorageもクリア
     localStorage.removeItem('lquest_demo_fs');
     localStorage.removeItem('lquest_demo_cwd');
+    setShowTutorial(true);
+    setTutorialStep(0);
   };
 
   // 現在のディレクトリのファイル一覧を取得
@@ -242,7 +321,14 @@ export const Demo = () => {
   const files = getCurrentFiles();
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white font-sans">
+    <div className="min-h-screen bg-[#020617] text-white font-sans relative">
+      <TutorialOverlay 
+        steps={TUTORIAL_STEPS}
+        currentStep={tutorialStep}
+        onNext={handleTutorialNext}
+        onSkip={() => setShowTutorial(false)}
+        isActive={showTutorial}
+      />
       {/* Header */}
       <div className="border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -276,7 +362,7 @@ export const Demo = () => {
         {/* Main Demo Area */}
         <div className="grid lg:grid-cols-2 gap-6 items-stretch mb-8">
           {/* CLI Terminal */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[500px] relative">
+          <div id="demo-terminal" className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[500px] relative">
             <div className="h-8 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -293,8 +379,8 @@ export const Demo = () => {
                   {cmd.comment && (
                     <div className="text-slate-500 text-xs mb-1"># {cmd.comment}</div>
                   )}
-                  <div className="flex gap-2">
-                    <span className="text-primary-500 font-bold">guest@l-quest:~$</span>
+                  <div className="flex gap-2 flex-nowrap">
+                    <span className="text-primary-500 font-bold whitespace-nowrap shrink-0">guest@l-quest:~$</span>
                     <span className="text-white">{cmd.command}</span>
                   </div>
                   {cmd.output && (
@@ -303,8 +389,8 @@ export const Demo = () => {
                 </div>
               ))}
 
-              <div className="flex gap-2 items-center">
-                <span className="text-primary-500 font-bold">guest@l-quest:~$</span>
+              <div className="flex gap-2 items-center flex-nowrap">
+                <span className="text-primary-500 font-bold whitespace-nowrap shrink-0">guest@l-quest:~$</span>
                 <input
                   ref={inputRef}
                   type="text"
@@ -341,7 +427,7 @@ export const Demo = () => {
           </div>
 
           {/* GUI File Manager */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[500px]">
+          <div id="demo-file-manager" className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[500px]">
             <div className="h-8 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
