@@ -290,6 +290,88 @@ export const executeCommand = (
       return { output: results.join('\n') };
     }
 
+    case 'file': {
+      const { options: fileOptionsRaw, params: fileParams } = parseArgs(args);
+      const opts = parseOptions(fileOptionsRaw);
+      
+      let targets = [...fileParams];
+      
+      // Support -f, --files-from
+      if ((opts.has('f') || opts.has('files-from')) && targets.length > 0) {
+        const listFile = targets.shift()!;
+        const listNode = resolvePath(fs, cwd, listFile);
+        if (listNode && listNode.type === 'file' && listNode.content) {
+          const extraTargets = listNode.content.split('\n').map(l => l.trim()).filter(l => l);
+          targets = [...extraTargets, ...targets];
+        } else if (!listNode) {
+          return { output: `file: cannot open '${listFile}' (No such file or directory)` };
+        }
+      }
+
+      if (targets.length === 0) return { output: 'file: missing operand' };
+      
+      const results: string[] = [];
+      const showName = !opts.has('b') && !opts.has('brief');
+      const useMime = opts.has('i') || opts.has('mime');
+      const noPad = opts.has('N') || opts.has('no-pad');
+      const uncompress = opts.has('z') || opts.has('uncompress');
+
+      // Calculate max length for padding (only if showing names and not suppressed)
+      const maxLen = targets.length > 0 ? Math.max(...targets.map(t => t.length)) : 0;
+
+      for (const target of targets) {
+        const node = resolvePath(fs, cwd, target);
+        if (!node) {
+          results.push(`${target}: cannot open '${target}' (No such file or directory)`);
+          continue;
+        }
+
+        let typeStr = '';
+        const nameLower = node.name.toLowerCase();
+        const isCompressed = nameLower.endsWith('.gz') || nameLower.endsWith('.tgz') || nameLower.endsWith('.zip') || nameLower.endsWith('.bz2');
+        
+        if (node.type === 'directory') {
+          typeStr = useMime ? 'inode/directory; charset=binary' : 'directory';
+        } else {
+          const content = node.content || '';
+          if (content.length === 0) {
+            typeStr = useMime ? 'application/x-empty; charset=binary' : 'empty';
+          } else if (content.startsWith('#!')) {
+            typeStr = useMime ? 'text/x-shellscript; charset=us-ascii' : 'POSIX shell script, ASCII text executable';
+          } else if (isCompressed) {
+            if (uncompress) {
+              typeStr = useMime ? 'application/x-compressed-content; charset=binary' : `compressed data, contents: (simulated data inside ${nameLower})`;
+            } else {
+              if (nameLower.endsWith('.zip')) {
+                typeStr = useMime ? 'application/zip; charset=binary' : 'Zip archive data';
+              } else if (nameLower.endsWith('.bz2')) {
+                typeStr = useMime ? 'application/x-bzip2; charset=binary' : 'bzip2 compressed data';
+              } else {
+                typeStr = useMime ? 'application/gzip; charset=binary' : 'gzip compressed data';
+              }
+            }
+          } else if (nameLower.endsWith('.tar')) {
+            typeStr = useMime ? 'application/x-tar; charset=binary' : 'POSIX tar archive';
+          } else {
+            const isASCII = /^[\x00-\x7F]*$/.test(content);
+            if (useMime) {
+              typeStr = isASCII ? 'text/plain; charset=us-ascii' : 'application/octet-stream; charset=binary';
+            } else {
+              typeStr = isASCII ? 'ASCII text' : 'data';
+            }
+          }
+        }
+        
+        if (showName) {
+          const padding = noPad ? '' : ' '.repeat(maxLen - target.length);
+          results.push(`${target}:${padding} ${typeStr}`);
+        } else {
+          results.push(typeStr);
+        }
+      }
+      return { output: results.join('\n') };
+    }
+
     case 'cd': {
       const { params: cdParams } = parseArgs(args);
       let targetDir = cdParams[0] || HOME_DIR;
