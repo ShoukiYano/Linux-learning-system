@@ -196,33 +196,19 @@ export const executeCommand = (
 
   // Helper to apply redirection to result
   const applyRedirection = (result: CommandResult): CommandResult => {
-    if (!redirectTarget || result.output === '') return result;
+    if (!redirectTarget) return result;
     
     // Write output to file
-    // If output ends with newline, standard shell usually keeps it.
-    // Our writeFile is simple.
-    
     let currentFs = result.newFs || fs;
-    
-    // Resolve target path logic (reuse logic from existing echo or writeFile)
-    // We can use the writeFile helper we improved!
-    // But we need to handle append mode.
+    let contentToWrite = result.output;
     
     if (redirectAppend) {
-      // Read existing content if possible
       const node = resolvePath(currentFs, result.newCwd || cwd, redirectTarget);
       const prevContent = (node && node.type === 'file') ? (node.content || '') : '';
-      const newContent = prevContent + (prevContent && !prevContent.endsWith('\n') ? '\n' : '') + result.output;
-      currentFs = writeFile(currentFs, result.newCwd || cwd, redirectTarget, newContent, true); // Create parents if needed? Shell usually implies it for >? No, usually > fails if directory missing? 
-      // Actually standard bash `> file` does NOT create parent directories relative to CWD.
-      // But let's be user friendly or strict? `echo "a" > a/b` fails if `a` doesn't exist.
-      // Let's use createParents=false for strictness, or strictly follow shell behavior.
-      // Using createParents=false for now to match typical shell behavior unless requested otherwise.
-      // Wait, I updated writeFile to have createParents=false by default.
-    } else {
-      // Overwrite
-      currentFs = writeFile(currentFs, result.newCwd || cwd, redirectTarget, result.output, false);
+      contentToWrite = prevContent + (prevContent && !prevContent.endsWith('\n') ? '\n' : '') + contentToWrite;
     }
+    
+    currentFs = writeFile(currentFs, result.newCwd || cwd, redirectTarget, contentToWrite, false);
     
     return {
       ...result,
@@ -230,6 +216,11 @@ export const executeCommand = (
       newFs: currentFs
     };
   };
+
+  // Special case: just redirection like "> file" or ">> file" without a command
+  if (cmd === '' && redirectTarget) {
+      return applyRedirection({ output: '', newCwd: cwd });
+  }
 
   // Wrap execution to capture output for redirection
   const executeCore = (): CommandResult => {
@@ -912,13 +903,20 @@ export const executeCommand = (
       const traverse = (node: FileSystemNode, currentPath: string) => {
         let isMatch = true;
         if (namePattern) {
-          // simple glob to regex: *.txt -> ^.*\.txt$
-          const regexPattern = namePattern
+          // Robust glob to regex: *.txt -> ^.*\.txt$
+          // Handle cases like "config*", "*log*", "*.conf"
+          let regexStr = namePattern
             .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex chars
             .replace(/\*/g, '.*')
             .replace(/\?/g, '.');
-          const regex = new RegExp(`^${regexPattern}$`);
-          isMatch = regex.test(node.name);
+          
+          if (!namePattern.includes('*') && !namePattern.includes('?')) {
+            // If no wildcards, exact match
+            isMatch = node.name === namePattern;
+          } else {
+            const regex = new RegExp(`^${regexStr}$`);
+            isMatch = regex.test(node.name);
+          }
         }
 
         if (isMatch) {
@@ -939,38 +937,55 @@ export const executeCommand = (
 
     case 'head':
     case 'tail': {
-      const { options: htOptionsRaw, params: htParams } = parseArgs(args);
       const isHead = cmd === 'head';
+      const { options: htOptionsRaw, params: htParams } = parseArgs(args);
       
-      // オプション解析 (-n 5 or -5)
       let maxLines = 10;
-      const nIndex = args.indexOf('-n');
-      if (nIndex !== -1 && args[nIndex+1]) {
-         maxLines = parseInt(args[nIndex+1], 10);
-      } else {
-         // -5 のような形式を探す
-         const numOpt = args.find(a => /^-\d+$/.test(a));
-         if (numOpt) maxLines = parseInt(numOpt.slice(1), 10);
-      }
-      
-      let contentArr: string[] = [];
-      let name = '';
+      let targets = [...htParams];
 
-      if (htParams.length === 0 && stdin !== undefined) {
-          contentArr = stdin.split('\n');
-          name = '(stdin)';
-      } else if (htParams.length > 0) {
-          const file = htParams[0];
-          const node = resolvePath(fs, cwd, file);
-          if (!node) return { output: `${cmd}: cannot open '${file}': No such file or directory` };
-          contentArr = (node.content || '').split('\n');
-          name = file;
+      // Improved argument parsing for head/tail
+      // 1. Handle -n 5
+      const nIndex = args.indexOf('-n');
+      if (nIndex !== -1 && args[nIndex + 1]) {
+          maxLines = parseInt(args[nIndex + 1], 10);
+          // Only remove the specific numeric value that followed -n
+          const nextArg = args[nIndex + 1];
+          const paramIndex = targets.indexOf(nextArg);
+          if (paramIndex !== -1) {
+              targets.splice(paramIndex, 1);
+          }
       } else {
-          return { output: `${cmd}: missing operand` };
+          // 2. Handle -5
+          const numOpt = args.find(a => /^-\d+$/.test(a));
+          if (numOpt) {
+            maxLines = parseInt(numOpt.slice(1), 10);
+            targets = targets.filter(t => t !== numOpt);
+          }
       }
-      
-      const result = isHead ? contentArr.slice(0, maxLines) : contentArr.slice(-maxLines);
-      return { output: result.join('\n') };
+
+      const processContent = (content: string, fileName: string) => {
+        const lines = content.split('\n');
+        const selected = isHead ? lines.slice(0, maxLines) : lines.slice(-maxLines);
+        return selected.join('\n');
+      };
+
+      if (targets.length === 0) {
+        if (stdin !== undefined) {
+          return { output: processContent(stdin, '(stdin)') };
+        }
+        return { output: `${cmd}: missing operand` };
+      }
+
+      const results = targets.map(target => {
+        const node = resolvePath(fs, cwd, target);
+        if (!node) return `${cmd}: cannot open '${target}': No such file or directory`;
+        if (node.type === 'directory') return `${cmd}: error reading '${target}': Is a directory`;
+        
+        const content = processContent(node.content || '', target);
+        return targets.length > 1 ? `==> ${target} <==\n${content}` : content;
+      });
+
+      return { output: results.join('\n\n') };
     }
 
     case 'chmod': {
@@ -1135,13 +1150,14 @@ export const executeCommand = (
         
         if (dirNode && dirNode.children) {
           if (dirNode.children[fileName] && append) {
-            dirNode.children[fileName].content += '\n' + text;
+            dirNode.children[fileName].content = (dirNode.children[fileName].content || '') + (dirNode.children[fileName].content ? '\n' : '') + text;
           } else {
             dirNode.children[fileName] = {
               name: fileName,
               type: 'file',
               permissions: '-rw-r--r--',
-              content: text
+              content: text,
+              updatedAt: new Date().toISOString()
             };
           }
           return { output: '', newFs };
@@ -1150,6 +1166,197 @@ export const executeCommand = (
         }
       }
       return { output: text };
+    }
+
+    case 'less': {
+        const { params } = parseArgs(args);
+        if (params.length === 0 && stdin === undefined) return { output: 'less: missing filename' };
+        
+        let content = '';
+        let fileName = '';
+        
+        if (params.length > 0) {
+            fileName = params[0];
+            const node = resolvePath(fs, cwd, fileName);
+            if (!node) return { output: `less: ${fileName}: No such file or directory` };
+            if (node.type === 'directory') return { output: `less: ${fileName}: Is a directory` };
+            content = node.content || '';
+        } else {
+            content = stdin || '';
+            fileName = '(stdin)';
+        }
+        
+        // Simple mock pager: show first window of content and a footer
+        const lines = content.split('\n');
+        const preview = lines.slice(0, 40).join('\n');
+        const footer = `\n\n(END) - ${fileName} (lines 1-${Math.min(40, lines.length)} of ${lines.length}) [Press q to exit]`;
+        return { output: preview + (lines.length > 40 ? footer : footer) };
+    }
+
+    case 'pstree': {
+        return { output: 
+`systemd(1)─┬─kthreadd(2)
+           ├─syslogd(345)
+           ├─sshd(420)───sshd(1000)───bash(1001)───pstree(${Math.floor(Math.random()*100)+2000})
+           ├─nginx(880)───nginx(881)
+           └─python3(1234)` 
+        };
+    }
+
+    case 'tar': {
+        const { options: tarOptsRaw, params: tarParams } = parseArgs(args);
+        const opts = parseOptions(tarOptsRaw);
+        
+        if (tarParams.length === 0) return { output: 'tar: must specify one of the options' };
+        
+        const isCreate = opts.has('c');
+        const isExtract = opts.has('x');
+        const isList = opts.has('t');
+        const isVerbose = opts.has('v');
+        const isFile = opts.has('f');
+        
+        if (isList) {
+            const archiveName = isFile ? tarParams[0] : '';
+            if (!archiveName) return { output: 'tar: must specify archive file with -f' };
+            const node = resolvePath(fs, cwd, archiveName);
+            if (!node || !node.content?.startsWith('__TAR_DATA__')) return { output: `tar: ${archiveName}: Not a tar archive` };
+            
+            try {
+                const data = JSON.parse(node.content.replace('__TAR_DATA__', ''));
+                return { output: Object.keys(data).join('\n') };
+            } catch(e) { return { output: 'tar: error reading archive' }; }
+        }
+        
+        if (isCreate) {
+            const archiveName = isFile ? tarParams[0] : 'out.tar';
+            const targets = isFile ? tarParams.slice(1) : tarParams;
+            if (targets.length === 0) return { output: 'tar: cowards refuse to create an empty archive' };
+            
+            const archiveData: Record<string, any> = {};
+            let out = '';
+            
+            for (const t of targets) {
+                const node = resolvePath(fs, cwd, t);
+                if (node) {
+                    archiveData[t] = JSON.parse(JSON.stringify(node));
+                    if (isVerbose) out += t + '\n';
+                }
+            }
+            
+            const newFs = writeFile(fs, cwd, archiveName, `__TAR_DATA__${JSON.stringify(archiveData)}`, false);
+            return { output: out.trim(), newFs };
+        }
+        
+        if (isExtract) {
+            const archiveName = isFile ? tarParams[0] : '';
+            if (!archiveName) return { output: 'tar: must specify archive file with -f' };
+            const node = resolvePath(fs, cwd, archiveName);
+            if (!node || !node.content?.startsWith('__TAR_DATA__')) return { output: `tar: ${archiveName}: Not a tar archive` };
+            
+            try {
+                const data = JSON.parse(node.content.replace('__TAR_DATA__', ''));
+                let currentFs = JSON.parse(JSON.stringify(fs));
+                let out = '';
+                for (const [name, nodeData] of Object.entries(data)) {
+                    const archivedNode = nodeData as FileSystemNode;
+                    if (archivedNode.type === 'directory') {
+                        currentFs = createDirectory(currentFs, cwd, name, true);
+                    } else {
+                        currentFs = writeFile(currentFs, cwd, name, archivedNode.content || '', false);
+                    }
+                    if (isVerbose) out += name + '\n';
+                }
+                return { output: out.trim(), newFs: currentFs };
+            } catch(e) { return { output: 'tar: error extracting archive' }; }
+        }
+        
+        return { output: 'tar: unknown operation' };
+    }
+
+    case 'awk': {
+        const { params } = parseArgs(args);
+        if (params.length === 0 && stdin === undefined) return { output: 'awk: missing script' };
+        
+        const script = params[0];
+        const targetFiles = params.slice(1);
+        
+        let content = '';
+        if (targetFiles.length > 0) {
+            for (const f of targetFiles) {
+                const node = resolvePath(fs, cwd, f);
+                if (node && node.type === 'file') content += (node.content || '') + '\n';
+            }
+        } else {
+            content = stdin || '';
+        }
+        
+        if (!script.includes('print')) return { output: '' };
+        
+        // Simple field extraction: {print $1, $2, $0}
+        const fields = script.match(/\$(\d+)/g)?.map(f => parseInt(f.slice(1), 10)) || [];
+        const printAll = script.includes('$0');
+        
+        const results = content.split('\n').filter(l => l.trim()).map(line => {
+            if (printAll) return line;
+            const parts = line.split(/\s+/).filter(p => p);
+            return fields.map(f => parts[f-1] || '').join(' ');
+        });
+        
+        return { output: results.join('\n') };
+    }
+
+    case 'apt': {
+        const { params } = parseArgs(args);
+        const op = params[0];
+        const pkg = params[1];
+        
+        if (op === 'update') {
+            return { output: 
+`Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease
+Get:2 http://archive.ubuntu.com/ubuntu jammy-updates InRelease
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done`, isAsync: true };
+        }
+        if (op === 'install') {
+            if (!pkg) return { output: 'apt: missing package name' };
+            return { output: 
+`Reading package lists... Done
+Building dependency tree... Done
+The following NEW packages will be installed:
+  ${pkg}
+0 upgraded, 1 newly installed, 0 to remove.
+Get:1 http://archive.ubuntu.com/ubuntu jammy/main ${pkg} 1.0 [100 KB]
+Fetched 100 KB in 0s (500 KB/s)
+Selecting previously unselected package ${pkg}.
+Preparing to unpack .../${pkg}_1.0_all.deb ...
+Unpacking ${pkg} (1.0) ...
+Setting up ${pkg} (1.0) ...`, isAsync: true };
+        }
+        return { output: `apt: unknown operation ${op}` };
+    }
+
+    case 'nginx': {
+        const { options } = parseArgs(args);
+        const opts = parseOptions(options);
+        if (opts.has('t')) {
+            return { output: 
+`nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful` };
+        }
+        return { output: 'nginx: use -t to test configuration' };
+    }
+
+    case 'crontab': {
+        const { options } = parseArgs(args);
+        const opts = parseOptions(options);
+        if (opts.has('l')) {
+            return { output: '0 3 * * * /home/student/backup.sh' };
+        }
+        if (opts.has('e')) {
+            return { output: '__NANO__crontab' }; // Mock opening in nano
+        }
+        return { output: 'crontab: use -l to list or -e to edit' };
     }
 
     // --- 新規追加コマンド ---
