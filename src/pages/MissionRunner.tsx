@@ -207,7 +207,10 @@ export const MissionRunner = () => {
       if (mission.initialFileSystem) {
          if (Array.isArray(mission.initialFileSystem)) {
              mission.initialFileSystem.forEach((file: { path: string, content: string, type?: 'file' | 'directory' }) => {
-                 if (file.type === 'directory') {
+                 // typeが指定されていない場合のフォールバック: 内容があればファイル、なければディレクトリとみなす
+                 const resolvedType = file.type || (file.content ? 'file' : 'directory');
+                 
+                 if (resolvedType === 'directory') {
                      initialFs = createDirectory(initialFs, '/', file.path, true);
                  } else {
                      initialFs = writeFile(initialFs, '/', file.path, file.content, true);

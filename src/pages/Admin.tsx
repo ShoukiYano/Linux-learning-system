@@ -87,6 +87,13 @@ export const Admin = () => {
       if (editingId) {
         // Update mission
         const { title, description, category, difficulty, xp, isLocked, initialFileSystem, orderIndex } = formData;
+        
+        // Ensure initial FS has types
+        const fsWithTypes = initialFileSystem.map(f => ({
+          ...f,
+          type: f.type || (f.content ? 'file' : 'directory')
+        }));
+
         await db.supabase
           .from('missions')
           .update({ 
@@ -97,7 +104,7 @@ export const Admin = () => {
             xp, 
             is_locked: isLocked,
             order_index: orderIndex, // Save orderIndex
-            initial_filesystem: initialFileSystem // Save initial FS
+            initial_filesystem: fsWithTypes
           })
           .eq('id', editingId);
       } else {
