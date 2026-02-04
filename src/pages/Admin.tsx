@@ -28,6 +28,7 @@ interface MissionFormData {
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Expert';
   xp: number;
   isLocked: boolean;
+  orderIndex: number; // Added orderIndex
   steps: MissionStepFormData[];
   initialFileSystem: FileEntry[];
 }
@@ -47,6 +48,7 @@ const initialFormData: MissionFormData = {
   difficulty: 'Easy',
   xp: 100,
   isLocked: false,
+  orderIndex: 0, // Initialize
   steps: [],
   initialFileSystem: [],
 };
@@ -83,7 +85,7 @@ export const Admin = () => {
 
       if (editingId) {
         // Update mission
-        const { title, description, category, difficulty, xp, isLocked, initialFileSystem } = formData;
+        const { title, description, category, difficulty, xp, isLocked, initialFileSystem, orderIndex } = formData;
         await db.supabase
           .from('missions')
           .update({ 
@@ -93,12 +95,13 @@ export const Admin = () => {
             difficulty, 
             xp, 
             is_locked: isLocked,
+            order_index: orderIndex, // Save orderIndex
             initial_filesystem: initialFileSystem // Save initial FS
           })
           .eq('id', editingId);
       } else {
         // Create mission
-        const { title, description, category, difficulty, xp, isLocked, initialFileSystem } = formData;
+        const { title, description, category, difficulty, xp, isLocked, initialFileSystem, orderIndex } = formData;
         const { data } = await db.supabase
           .from('missions')
           .insert([{ 
@@ -108,6 +111,7 @@ export const Admin = () => {
             difficulty, 
             xp, 
             is_locked: isLocked,
+            order_index: orderIndex, // Save orderIndex
             initial_filesystem: initialFileSystem // Save initial FS
           }])
           .select()
@@ -152,6 +156,7 @@ export const Admin = () => {
       difficulty: mission.difficulty,
       xp: mission.xp,
       isLocked: mission.is_locked || false,
+      orderIndex: mission.order_index || 0, // Load orderIndex
       steps: formattedSteps,
       initialFileSystem: mission.initial_filesystem || [], // Load initial FS
     });
@@ -432,6 +437,16 @@ export const Admin = () => {
                       step="10"
                     />
                   </div>
+                  
+                  <div>
+                    <label className="block text-sm font-bold mb-2">表示順序 (小さい順)</label>
+                    <input
+                      type="number"
+                      value={formData.orderIndex}
+                      onChange={(e) => setFormData({ ...formData, orderIndex: parseInt(e.target.value) })}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                    />
+                  </div>
                 </div>
 
                 <div className="mt-4">
@@ -680,6 +695,7 @@ export const Admin = () => {
             <table className="w-full">
               <thead className="bg-slate-900">
                 <tr>
+                  <th className="px-6 py-3 text-left text-sm font-bold">順序</th>
                   <th className="px-6 py-3 text-left text-sm font-bold">タイトル</th>
                   <th className="px-6 py-3 text-left text-sm font-bold">カテゴリ</th>
                   <th className="px-6 py-3 text-left text-sm font-bold">難易度</th>
@@ -691,6 +707,7 @@ export const Admin = () => {
               <tbody>
                 {missions.map((mission, idx) => (
                   <tr key={mission.id} className={idx % 2 === 0 ? 'bg-slate-800/50' : ''}>
+                    <td className="px-6 py-4 font-bold text-slate-400">#{mission.order_index}</td>
                     <td className="px-6 py-4">{mission.title}</td>
                     <td className="px-6 py-4">{mission.category}</td>
                     <td className="px-6 py-4">

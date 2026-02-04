@@ -19,6 +19,7 @@ export const AdminLearningPathEditor = () => {
     description: '',
     difficulty: 'intermediate' as 'beginner' | 'intermediate' | 'advanced',
     estimated_hours: 10,
+    order_index: 0,
   });
 
   const [selectedMissions, setSelectedMissions] = useState<string[]>([]);
@@ -81,6 +82,7 @@ export const AdminLearningPathEditor = () => {
       description: path.description || '',
       difficulty: path.difficulty || path.level?.toLowerCase() || 'intermediate',
       estimated_hours: path.estimated_hours || 10,
+      order_index: path.order_index || 0,
     });
     setSelectedMissions(path.missions || []);
     setShowForm(true);
@@ -99,10 +101,29 @@ export const AdminLearningPathEditor = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', description: '', difficulty: 'intermediate', estimated_hours: 10 });
+    setFormData({ name: '', description: '', difficulty: 'intermediate', estimated_hours: 10, order_index: 0 });
     setSelectedMissions([]);
     setEditingPath(null);
     setShowForm(false);
+  };
+
+  const addMission = (missionId: string) => {
+    if (!selectedMissions.includes(missionId)) {
+      setSelectedMissions([...selectedMissions, missionId]);
+    }
+  };
+
+  const removeMission = (missionId: string) => {
+    setSelectedMissions(selectedMissions.filter(id => id !== missionId));
+  };
+
+  const moveMission = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= selectedMissions.length) return;
+
+    const newMissions = [...selectedMissions];
+    [newMissions[index], newMissions[newIndex]] = [newMissions[newIndex], newMissions[index]];
+    setSelectedMissions(newMissions);
   };
 
   if (!isAdmin) return <div className="p-8">アクセス権限がありません</div>;
@@ -154,7 +175,7 @@ export const AdminLearningPathEditor = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-bold mb-2">難易度</label>
                   <select
@@ -178,28 +199,86 @@ export const AdminLearningPathEditor = () => {
                     min="1"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-bold mb-2">表示順 (小さい順)</label>
+                  <input
+                    type="number"
+                    value={formData.order_index}
+                    onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) })}
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold mb-3">含むミッション</label>
-                <div className="grid grid-cols-2 gap-4 max-h-64 overflow-y-auto">
-                  {missions.map(mission => (
-                    <label key={mission.id} className="flex items-center gap-3 p-3 bg-slate-700 rounded-lg cursor-pointer hover:bg-slate-600 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={selectedMissions.includes(mission.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedMissions([...selectedMissions, mission.id]);
-                          } else {
-                            setSelectedMissions(selectedMissions.filter(id => id !== mission.id));
-                          }
-                        }}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">{mission.title}</span>
-                    </label>
-                  ))}
+                <label className="block text-sm font-bold mb-3">ミッション管理 (ドラッグ＆ドロップではなく、ボタンで並べ替え)</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Available Missions */}
+                  <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/50">
+                    <h3 className="font-bold mb-2 text-slate-400">利用可能なミッション</h3>
+                    <div className="max-h-64 overflow-y-auto space-y-2">
+                       {missions
+                        .filter(m => !selectedMissions.includes(m.id))
+                        .map(mission => (
+                          <div key={mission.id} className="flex items-center justify-between p-2 bg-slate-800 rounded border border-slate-700">
+                            <span className="text-sm truncate mr-2">{mission.title}</span>
+                            <button
+                              type="button"
+                              onClick={() => addMission(mission.id)}
+                              className="text-primary-400 hover:text-white"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Selected Missions */}
+                  <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/50">
+                    <h3 className="font-bold mb-2 text-primary-400">選択中のミッション (上から順に表示)</h3>
+                    <div className="max-h-64 overflow-y-auto space-y-2">
+                      {selectedMissions.length === 0 && <p className="text-sm text-slate-500">ミッションが選択されていません</p>}
+                      {selectedMissions.map((missionId, index) => {
+                        const mission = missions.find(m => m.id === missionId);
+                        if (!mission) return null;
+                        return (
+                          <div key={missionId} className="flex items-center justify-between p-2 bg-slate-800 rounded border border-primary-500/30">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <span className="bg-primary-500/20 text-primary-400 text-xs font-bold px-2 py-0.5 rounded">{index + 1}</span>
+                              <span className="text-sm truncate">{mission.title}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveMission(index, 'up')}
+                                disabled={index === 0}
+                                className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveMission(index, 'down')}
+                                disabled={index === selectedMissions.length - 1}
+                                className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                              >
+                                ▼
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeMission(missionId)}
+                                className="p-1 text-red-400 hover:text-red-300"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -232,6 +311,7 @@ export const AdminLearningPathEditor = () => {
             <table className="w-full">
               <thead className="bg-slate-900">
                 <tr>
+                  <th className="px-6 py-3 text-left text-sm font-bold">順序</th>
                   <th className="px-6 py-3 text-left text-sm font-bold">名前</th>
                   <th className="px-6 py-3 text-left text-sm font-bold">難易度</th>
                   <th className="px-6 py-3 text-left text-sm font-bold">推定時間</th>
@@ -242,6 +322,7 @@ export const AdminLearningPathEditor = () => {
               <tbody>
                 {paths.map((path, idx) => (
                   <tr key={path.id} className={idx % 2 === 0 ? 'bg-slate-800/50' : ''}>
+                    <td className="px-6 py-4 font-bold text-slate-400">#{path.order_index}</td>
                     <td className="px-6 py-4 font-bold">{path.name}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-sm font-bold ${

@@ -99,7 +99,7 @@ export const db = {
     const { data, error } = await supabase
       .from('missions')
       .select('*')
-      .order('category');
+      .order('order_index', { ascending: true });
     return { data, error };
   },
 
@@ -318,7 +318,7 @@ export const db = {
         *,
         path_missions (mission_id)
       `)
-      .order('created_at', { ascending: false });
+      .order('order_index', { ascending: true }); // Sort by order_index
     
     const formattedData = data?.map(path => ({
       ...path,
@@ -342,6 +342,7 @@ export const db = {
         estimated_hours: path.estimated_hours,
         created_by: path.user_id,
         is_published: true,
+        order_index: path.order_index || 0, // Add order_index
       }])
       .select()
       .single();
@@ -374,6 +375,7 @@ export const db = {
         level: capitalizedLevel,
         estimated_hours: updates.estimated_hours,
         is_published: updates.is_published,
+        order_index: updates.order_index, // Add order_index
       })
       .eq('id', id)
       .select()
