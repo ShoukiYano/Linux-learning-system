@@ -18,14 +18,23 @@ export const Dashboard = () => {
   const [learningPaths, setLearningPaths] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [userMissions, setUserMissions] = useState<any[]>([]);
+  const [totalMissionsCount, setTotalMissionsCount] = useState(0);
 
   useEffect(() => {
     if (user?.id) {
       fetchUserMissions();
       fetchActivity();
       fetchLearningPaths();
+      fetchAllMissions();
     }
   }, [user]);
+
+  const fetchAllMissions = async () => {
+    const { data } = await db.getMissions();
+    if (data) {
+      setTotalMissionsCount(data.length);
+    }
+  };
 
   const fetchUserMissions = async () => {
     if (!user?.id) return;
@@ -70,7 +79,7 @@ export const Dashboard = () => {
     }
   };
 
-  const progressPercentage = Math.round((completedMissionsCount / MISSIONS.length) * 100);
+  const progressPercentage = totalMissionsCount > 0 ? Math.round((completedMissionsCount / totalMissionsCount) * 100) : 0;
 
   return (
     <Layout>
@@ -108,9 +117,9 @@ export const Dashboard = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 {learningPaths.slice(0, 2).map(path => {
                   const pathMissionsCount = path.missions?.length || 0;
-                  const completedInPath = path.missions?.filter((mId: string) => 
+                  const completedInPath = path.missions?.filter((mission: any) => 
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    userMissions.find((um: any) => um.mission_id === mId && um.is_completed)
+                    userMissions.find((um: any) => um.mission_id === (mission.id || mission) && um.is_completed)
                   ).length || 0;
                   const progress = pathMissionsCount > 0 ? (completedInPath / pathMissionsCount) * 100 : 0;
 
@@ -167,7 +176,7 @@ export const Dashboard = () => {
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg text-center">
                 <div className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.completed')}</div>
-                <div className="font-bold text-lg text-primary-600 dark:text-primary-400">{completedMissionsCount}/{MISSIONS.length}</div>
+                <div className="font-bold text-lg text-primary-600 dark:text-primary-400">{completedMissionsCount}/{totalMissionsCount}</div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg text-center">
                 <div className="text-xs text-slate-500 dark:text-slate-400">XP</div>
