@@ -101,13 +101,16 @@ interface MissionData {
 // 共通の初期FS構築ロジック
 const reconstructFs = (initialFileSystem: any[] | undefined) => {
   let initialFs = JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM));
+  // 初期ロード時は固定の「伝統的な」タイムスタンプ（Oct 25 10:00）に近い値を使用する
+  const traditionalTime = '2024-10-25T10:00:00Z';
+  
   if (initialFileSystem && Array.isArray(initialFileSystem)) {
     initialFileSystem.forEach((file: { path: string, content: string, type?: 'file' | 'directory' }) => {
       const resolvedType = file.type || (file.content ? 'file' : 'directory');
       if (resolvedType === 'directory') {
-        initialFs = createDirectory(initialFs, '/', file.path, true);
+        initialFs = createDirectory(initialFs, '/', file.path, true, traditionalTime);
       } else {
-        initialFs = writeFile(initialFs, '/', file.path, file.content, true);
+        initialFs = writeFile(initialFs, '/', file.path, file.content, true, traditionalTime);
       }
     });
   }

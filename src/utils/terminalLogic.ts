@@ -95,6 +95,23 @@ const calculateDirSize = (node: FileSystemNode): number => {
   return size;
 };
 
+// タイムスタンプのフォーマット (例: Oct 25 10:00)
+export const formatTimestamp = (dateStr?: string): string => {
+  // タイムスタンプが完全に欠けている場合は、デフォルトの「伝統的な日時」を表示
+  const finalDateStr = dateStr || '2024-10-25T10:00:00Z';
+  const date = new Date(finalDateStr);
+  
+  // パース失敗時の最終フォールバック
+  if (isNaN(date.getTime())) return 'Oct 25 10:00'; 
+  
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[date.getMonth()];
+  const day = String(date.getDate()).padStart(2, ' ');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${month} ${day} ${hours}:${minutes}`;
+};
+
 export interface CommandResult {
   output: string;
   newFs?: FileSystemNode;
@@ -234,11 +251,17 @@ export const executeCommand = (
             const sizeStr = opts.has('h') 
               ? (size > 1024 ? `${(size/1024).toFixed(1)}K` : size) 
               : size;
-            return `${formatPermissions(child)} 1 user user ${String(sizeStr).padStart(5)} Oct 25 10:00 ${child.name}`;
+            const ts = formatTimestamp(child.updatedAt);
+            return `${formatPermissions(child)} 1 user user ${String(sizeStr).padStart(5)} ${ts} ${child.name}${opts.has('F') && child.type === 'directory' ? '/' : ''}`;
           });
           output += lines.join('\n');
         } else {
-          output += items.map(i => i.name).join('  ');
+          output += items.map(i => {
+            let name = i.name;
+            if (opts.has('p') && i.type === 'directory') name += '/';
+            else if (opts.has('F') && i.type === 'directory') name += '/';
+            return name;
+          }).join('  ');
         }
 
         if (opts.has('R')) {
@@ -315,7 +338,8 @@ export const executeCommand = (
                         name: part,
                         type: 'directory',
                         permissions: 'drwxr-xr-x',
-                        children: {}
+                        children: {},
+                        updatedAt: new Date().toISOString()
                     };
                 }
                 current = current.children[part];
@@ -342,7 +366,8 @@ export const executeCommand = (
                   name: dirName,
                   type: 'directory',
                   permissions: 'drwxr-xr-x',
-                  children: {}
+                  children: {},
+                  updatedAt: new Date().toISOString()
                 };
              } else {
                 errorMsg += `mkdir: cannot create directory '${dirPath}': No such file or directory\n`;
@@ -371,7 +396,8 @@ export const executeCommand = (
               name: name,
               type: 'file',
               permissions: '-rw-r--r--',
-              content: ''
+              content: '',
+              updatedAt: new Date().toISOString()
             };
           }
         }
@@ -468,6 +494,7 @@ export const executeCommand = (
         }
 
         const copyNode = JSON.parse(JSON.stringify(srcNode));
+        copyNode.updatedAt = new Date().toISOString();
         
         if (isDestDir) {
            if (destNode && destNode.children) {
@@ -1491,7 +1518,8 @@ export const createDirectory = (
   root: FileSystemNode,
   cwd: string,
   dirPath: string,
-  createParents: boolean = true
+  createParents: boolean = true,
+  updatedAt?: string
 ): FileSystemNode => {
   const newFs = JSON.parse(JSON.stringify(root));
   const absPath = normalizePath(cwd, dirPath);
@@ -1506,7 +1534,8 @@ export const createDirectory = (
           type: 'directory',
           name: part,
           children: {},
-          permissions: 'drwxr-xr-x'
+          permissions: 'drwxr-xr-x',
+          updatedAt: updatedAt || new Date().toISOString()
         };
       } else {
         return root; // Parent missing and -p not specified
@@ -1523,7 +1552,8 @@ export const writeFile = (
   cwd: string,
   filePath: string,
   content: string,
-  createParents: boolean = false
+  createParents: boolean = false,
+  updatedAt?: string
 ): FileSystemNode => {
   const newFs = JSON.parse(JSON.stringify(root));
   
@@ -1556,7 +1586,8 @@ export const writeFile = (
           type: 'directory',
           name: part,
           children: {},
-          permissions: 'drwxr-xr-x'
+          permissions: 'drwxr-xr-x',
+          updatedAt: updatedAt || new Date().toISOString()
         };
       } else {
         // 親ディレクトリが存在しない場合はエラー
@@ -1573,7 +1604,8 @@ export const writeFile = (
     type: 'file',
     name: fileName,
     content: content,
-    permissions: 'rw-r--r--'
+    permissions: 'rw-r--r--',
+    updatedAt: updatedAt || new Date().toISOString()
   };
 
   return newFs;

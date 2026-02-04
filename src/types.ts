@@ -62,6 +62,7 @@ export interface FileSystemNode {
   children?: { [key: string]: FileSystemNode }; // For directories
   permissions?: string; // e.g., "drwxr-xr-x"
   owner?: string;
+  updatedAt?: string; // ISO string for modification time
 }
 
 export interface CommandDoc {

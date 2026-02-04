@@ -14,6 +14,7 @@ export const INITIAL_FILE_SYSTEM: FileSystemNode = {
   name: 'root',
   type: 'directory',
   permissions: 'drwxr-xr-x',
+  updatedAt: '2024-10-25T10:00:00Z',
   children: {
     'bin': {
       name: 'bin',
@@ -55,6 +56,7 @@ export const INITIAL_FILE_SYSTEM: FileSystemNode = {
               name: 'documents',
               type: 'directory',
               permissions: 'drwxr-xr-x',
+              updatedAt: '2024-10-25T10:00:00Z',
               children: {
                 'notes.txt': { name: 'notes.txt', type: 'file', content: 'Linux is awesome.', permissions: '-rw-r--r--' }
               }
