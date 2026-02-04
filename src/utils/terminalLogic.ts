@@ -1487,6 +1487,37 @@ MiB Swap:   2048.0 total,   2048.0 free,      0.0 used.   6450.0 avail Mem
 };
 
 // ファイル書き込みヘルパー（絶対パスまたはCWD相対パスに対応）
+export const createDirectory = (
+  root: FileSystemNode,
+  cwd: string,
+  dirPath: string,
+  createParents: boolean = true
+): FileSystemNode => {
+  const newFs = JSON.parse(JSON.stringify(root));
+  const absPath = normalizePath(cwd, dirPath);
+  const parts = absPath.split('/').filter(p => p);
+
+  let current = newFs;
+  for (const part of parts) {
+    if (!current.children) current.children = {};
+    if (!current.children[part]) {
+      if (createParents || part === parts[parts.length - 1]) {
+        current.children[part] = {
+          type: 'directory',
+          name: part,
+          children: {},
+          permissions: 'drwxr-xr-x'
+        };
+      } else {
+        return root; // Parent missing and -p not specified
+      }
+    }
+    current = current.children[part];
+    if (current.type !== 'directory') return root; // Path blocked by file
+  }
+  return newFs;
+};
+
 export const writeFile = (
   root: FileSystemNode,
   cwd: string,
@@ -1497,7 +1528,6 @@ export const writeFile = (
   const newFs = JSON.parse(JSON.stringify(root));
   
   // パスの解決
-  // 絶対パスか相対パスか判定
   const isAbsolute = filePath.startsWith('/');
   let targetPath = isAbsolute ? filePath : (cwd === '/' ? `/${filePath}` : `${cwd}/${filePath}`);
   
@@ -1526,7 +1556,7 @@ export const writeFile = (
           type: 'directory',
           name: part,
           children: {},
-          permissions: 'rwxr-xr-x'
+          permissions: 'drwxr-xr-x'
         };
       } else {
         // 親ディレクトリが存在しない場合はエラー

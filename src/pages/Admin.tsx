@@ -18,6 +18,7 @@ interface MissionStepFormData {
 interface FileEntry {
   path: string;
   content: string;
+  type: 'file' | 'directory';
 }
 
 interface MissionFormData {
@@ -102,6 +103,13 @@ export const Admin = () => {
       } else {
         // Create mission
         const { title, description, category, difficulty, xp, isLocked, initialFileSystem, orderIndex } = formData;
+        
+        // Ensure initial FS has types (for legacy data)
+        const fsWithTypes = initialFileSystem.map(f => ({
+          ...f,
+          type: f.type || (f.content ? 'file' : 'directory')
+        }));
+
         const { data } = await db.supabase
           .from('missions')
           .insert([{ 
@@ -112,7 +120,7 @@ export const Admin = () => {
             xp, 
             is_locked: isLocked,
             order_index: orderIndex, // Save orderIndex
-            initial_filesystem: initialFileSystem // Save initial FS
+            initial_filesystem: fsWithTypes
           }])
           .select()
           .single();
@@ -158,7 +166,10 @@ export const Admin = () => {
       isLocked: mission.is_locked || false,
       orderIndex: mission.order_index || 0, // Load orderIndex
       steps: formattedSteps,
-      initialFileSystem: mission.initial_filesystem || [], // Load initial FS
+      initialFileSystem: (mission.initial_filesystem || []).map((f: any) => ({
+        ...f,
+        type: f.type || (f.content ? 'file' : 'directory')
+      })),
     });
     setEditingId(mission.id);
     setShowForm(true);
@@ -206,7 +217,7 @@ export const Admin = () => {
   const addFile = () => {
     setFormData({
       ...formData,
-      initialFileSystem: [...formData.initialFileSystem, { path: '', content: '' }]
+      initialFileSystem: [...formData.initialFileSystem, { path: '', content: '', type: 'file' }]
     });
   };
 
@@ -218,6 +229,12 @@ export const Admin = () => {
   const updateFile = (index: number, field: keyof FileEntry, value: string) => {
     const newFs = [...formData.initialFileSystem];
     newFs[index] = { ...newFs[index], [field]: value };
+    
+    // If auto-detecting directory by empty name or explicit choice
+    if (field === 'type' && value === 'directory') {
+      newFs[index].content = '';
+    }
+    
     setFormData({ ...formData, initialFileSystem: newFs });
   };
 
@@ -493,15 +510,28 @@ export const Admin = () => {
                     {formData.initialFileSystem.map((file, index) => (
                       <div key={index} className="bg-slate-800 p-4 rounded-lg border border-slate-700">
                         <div className="flex justify-between items-start mb-3">
-                          <div className="flex-1 mr-4">
-                            <label className="block text-xs font-bold mb-1 text-slate-400">ファイルパス (例: documents/hello.txt)</label>
-                            <input
-                              type="text"
-                              value={file.path}
-                              onChange={(e) => updateFile(index, 'path', e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white font-mono"
-                              placeholder="path/to/file.txt"
-                            />
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 mr-4">
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-bold mb-1 text-slate-400">ファイル/フォルダパス (例: documents/hello.txt)</label>
+                              <input
+                                type="text"
+                                value={file.path}
+                                onChange={(e) => updateFile(index, 'path', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white font-mono"
+                                placeholder="path/to/item"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold mb-1 text-slate-400">種別</label>
+                              <select
+                                value={file.type}
+                                onChange={(e) => updateFile(index, 'type', e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white focus:outline-none focus:border-primary-500"
+                              >
+                                <option value="file">📄 ファイル</option>
+                                <option value="directory">📁 フォルダ</option>
+                              </select>
+                            </div>
                           </div>
                           <button
                             type="button"
@@ -511,15 +541,22 @@ export const Admin = () => {
                             <Trash2 size={18} />
                           </button>
                         </div>
-                        <div>
-                          <label className="block text-xs font-bold mb-1 text-slate-400">ファイル内容</label>
-                          <textarea
-                            value={file.content}
-                            onChange={(e) => updateFile(index, 'content', e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white h-24 font-mono whitespace-pre"
-                            placeholder="ファイルの中身を入力..."
-                          />
-                        </div>
+                        {file.type === 'file' && (
+                          <div>
+                            <label className="block text-xs font-bold mb-1 text-slate-400">ファイル内容</label>
+                            <textarea
+                              value={file.content}
+                              onChange={(e) => updateFile(index, 'content', e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white h-24 font-mono whitespace-pre"
+                              placeholder="ファイルの中身を入力..."
+                            />
+                          </div>
+                        )}
+                        {file.type === 'directory' && (
+                          <div className="py-2 px-3 bg-slate-900/30 rounded border border-dashed border-slate-700 text-xs text-slate-500 italic">
+                            空のフォルダが作成されます
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

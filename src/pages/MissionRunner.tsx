@@ -9,7 +9,7 @@ import { clsx } from 'clsx';
 import { db } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
 import { useLanguage } from '../lib/LanguageContext';
-import { resolvePath, writeFile, CommandResult, executeCommandLine } from '../utils/terminalLogic';
+import { resolvePath, writeFile, createDirectory, CommandResult, executeCommandLine } from '../utils/terminalLogic';
 
 // 検証関数を生成するヘルパー
 const createValidationFunction = (
@@ -206,8 +206,12 @@ export const MissionRunner = () => {
       
       if (mission.initialFileSystem) {
          if (Array.isArray(mission.initialFileSystem)) {
-             mission.initialFileSystem.forEach((file: { path: string, content: string }) => {
-                 initialFs = writeFile(initialFs, '/', file.path, file.content, true);
+             mission.initialFileSystem.forEach((file: { path: string, content: string, type?: 'file' | 'directory' }) => {
+                 if (file.type === 'directory') {
+                     initialFs = createDirectory(initialFs, '/', file.path, true);
+                 } else {
+                     initialFs = writeFile(initialFs, '/', file.path, file.content, true);
+                 }
              });
          }
       }
