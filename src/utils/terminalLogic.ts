@@ -1,4 +1,4 @@
-import { FileSystemNode } from '../types';
+import { FileSystemNode, CommandHistory } from '../types';
 export const HOME_DIR = '/home/student';
 
 // Helper to traverse the FS
@@ -118,10 +118,95 @@ export const executeCommand = (
   fs: FileSystemNode, 
   cwd: string,
   stdin?: string,
-  oldPwd?: string
+  oldPwd?: string,
+  history: CommandHistory[] = []
 ): CommandResult => {
+  // --- Generic Redirection Handling ---
+  let redirectTarget = '';
+  let redirectAppend = false;
   
-  switch (cmd) {
+  // Custom parsing for redirection to handle cases like "ls > file" or "echo hello > file"
+  // We need to look for > or >> in args
+  const newArgs: string[] = [];
+  let skipNext = false;
+
+  for (let i = 0; i < args.length; i++) {
+    if (skipNext) {
+      skipNext = false;
+      continue;
+    }
+    const arg = args[i];
+    if (arg === '>') {
+      redirectAppend = false;
+      if (args[i+1]) {
+        redirectTarget = args[i+1];
+        skipNext = true;
+      }
+    } else if (arg === '>>') {
+      redirectAppend = true;
+      if (args[i+1]) {
+        redirectTarget = args[i+1];
+        skipNext = true;
+      }
+    } else if (arg.startsWith('>>')) {
+      redirectAppend = true;
+      redirectTarget = arg.slice(2) || (args[i+1] ? args[i+1] : '');
+      if (!arg.slice(2)) skipNext = true;
+    } else if (arg.startsWith('>')) {
+      redirectAppend = false;
+      redirectTarget = arg.slice(1) || (args[i+1] ? args[i+1] : '');
+      if (!arg.slice(1)) skipNext = true;
+    } else {
+      newArgs.push(arg);
+    }
+  }
+
+  // Use newArgs for the actual command execution if redirection was found
+  // Exception: echo might treat > as text if quoted, but tokenizeCommand handles quotes.
+  // We assume tokenizeCommand has already split arguments correctly.
+  const effectiveArgs = redirectTarget ? newArgs : args;
+
+  // Helper to apply redirection to result
+  const applyRedirection = (result: CommandResult): CommandResult => {
+    if (!redirectTarget || result.output === '') return result;
+    
+    // Write output to file
+    // If output ends with newline, standard shell usually keeps it.
+    // Our writeFile is simple.
+    
+    let currentFs = result.newFs || fs;
+    
+    // Resolve target path logic (reuse logic from existing echo or writeFile)
+    // We can use the writeFile helper we improved!
+    // But we need to handle append mode.
+    
+    if (redirectAppend) {
+      // Read existing content if possible
+      const node = resolvePath(currentFs, result.newCwd || cwd, redirectTarget);
+      const prevContent = (node && node.type === 'file') ? (node.content || '') : '';
+      const newContent = prevContent + (prevContent && !prevContent.endsWith('\n') ? '\n' : '') + result.output;
+      currentFs = writeFile(currentFs, result.newCwd || cwd, redirectTarget, newContent, true); // Create parents if needed? Shell usually implies it for >? No, usually > fails if directory missing? 
+      // Actually standard bash `> file` does NOT create parent directories relative to CWD.
+      // But let's be user friendly or strict? `echo "a" > a/b` fails if `a` doesn't exist.
+      // Let's use createParents=false for strictness, or strictly follow shell behavior.
+      // Using createParents=false for now to match typical shell behavior unless requested otherwise.
+      // Wait, I updated writeFile to have createParents=false by default.
+    } else {
+      // Overwrite
+      currentFs = writeFile(currentFs, result.newCwd || cwd, redirectTarget, result.output, false);
+    }
+    
+    return {
+      ...result,
+      output: '', // checking output is consumed
+      newFs: currentFs
+    };
+  };
+
+  // Wrap execution to capture output for redirection
+  const executeCore = (): CommandResult => {
+    const args = effectiveArgs;
+    switch (cmd) {
     case 'pwd':
       return { output: cwd };
     
@@ -207,27 +292,61 @@ export const executeCommand = (
       let errorMsg = '';
 
       for (const dirPath of mkdirParams) {
-        const parts = dirPath.split('/').filter(p => p);
-        const dirName = parts.pop() || '';
-        const parentPath = dirPath.startsWith('/') ? '/' + parts.join('/') : parts.join('/') || '.';
+        // Resolve parent path
+        const parts = normalizePath(cwd, dirPath).split('/').filter(p => p);
+        if (dirPath.startsWith('/')) {
+             // Absolute
+        }
         
-        let parentNode = resolvePath(newFs, cwd, parentPath);
+        // Use a logic similar to writeFile's directory creation
+        // If -p is specified, we create all parts.
         
-        if (parentNode && parentNode.children) {
-           if (parentNode.children[dirName] && !opts.has('p')) {
-             errorMsg += `mkdir: cannot create directory '${dirName}': File exists\n`;
-             continue;
-           }
-           if (!parentNode.children[dirName]) {
-             parentNode.children[dirName] = {
-               name: dirName,
-               type: 'directory',
-               permissions: 'drwxr-xr-x',
-               children: {}
-             };
-           }
+        if (opts.has('p')) {
+            let current = newFs;
+            // Iterate all parts from root or cwd
+            // To simplify, let's use the absolute path parts
+            const absPath = normalizePath(cwd, dirPath); // returns prompt /a/b/c
+            const absParts = absPath.split('/').filter(p => p);
+            
+            for (const part of absParts) {
+                if (!current.children) current.children = {};
+                if (!current.children[part]) {
+                    current.children[part] = {
+                        name: part,
+                        type: 'directory',
+                        permissions: 'drwxr-xr-x',
+                        children: {}
+                    };
+                }
+                current = current.children[part];
+                if (current.type !== 'directory') {
+                     errorMsg += `mkdir: cannot create directory '${dirPath}': Not a directory\n`;
+                     break; 
+                }
+            }
         } else {
-           errorMsg += `mkdir: cannot create directory '${dirPath}': No such file or directory\n`;
+            // Normal mkdir (non-recursive)
+            // Need to resolve parent manually
+             const parts = dirPath.split('/').filter(p => p);
+             const dirName = parts.pop() || '';
+             const parentPath = dirPath.startsWith('/') ? '/' + parts.join('/') : parts.join('/') || '.';
+             
+             let parentNode = resolvePath(newFs, cwd, parentPath);
+             
+             if (parentNode && parentNode.children) {
+                if (parentNode.children[dirName]) {
+                  errorMsg += `mkdir: cannot create directory '${dirName}': File exists\n`;
+                  continue;
+                }
+                parentNode.children[dirName] = {
+                  name: dirName,
+                  type: 'directory',
+                  permissions: 'drwxr-xr-x',
+                  children: {}
+                };
+             } else {
+                errorMsg += `mkdir: cannot create directory '${dirPath}': No such file or directory\n`;
+             }
         }
       }
 
@@ -1145,9 +1264,27 @@ export const executeCommand = (
     case 'help':
       return { output: `Available commands:\n\nFile Ops:\n  ls, cp, mv, rm, touch, mkdir, ln, chmod, chown\n\nText Ops:\n  cat, head, tail, grep, sort, uniq, cut, wc, echo, diff\n\nSystem/Info:\n  cd, pwd, whoami, date, du, df, ps, kill, tree, basename, dirname\n\nTry 'man <command>' for more information.` };
 
+    case 'clear':
+      return { output: '__CLEAR__' };
+
+    case 'history': {
+      const { options: histOptionsRaw } = parseArgs(effectiveArgs);
+      const opts = parseOptions(histOptionsRaw);
+      
+      // -c: clear history logic if we had mutable history here, but history is passed from state. 
+      // We can only display it.
+      
+      const lines = history.map((h, i) => ` ${i + 1}  ${h.command}`);
+      return { output: lines.join('\n') };
+    }
+
     default:
       return { output: `bash: ${cmd}: command not found` };
   }
+  }; // End executeCore
+
+  const result = executeCore();
+  return applyRedirection(result);
 };
 
 // ファイル書き込みヘルパー（絶対パスまたはCWD相対パスに対応）
@@ -1257,7 +1394,8 @@ export const executeCommandLine = (
   cwd: string,
   onFsChange: (fs: FileSystemNode) => void,
   onCwdChange: (cwd: string) => void,
-  oldPwd?: string
+  oldPwd?: string,
+  history: CommandHistory[] = []
 ): CommandResult => {
   // Manual scanner to split by pipes while respecting quotes and full-width characters
   const stages: string[] = [];
@@ -1299,7 +1437,7 @@ export const executeCommandLine = (
     const cmd = tokens[0];
     const args = tokens.slice(1);
 
-    const result = executeCommand(cmd, args, currentFs, currentCwd, i > 0 ? lastOutput : undefined, oldPwd);
+    const result = executeCommand(cmd, args, currentFs, currentCwd, i > 0 ? lastOutput : undefined, oldPwd, history);
 
     if (result.newFs) {
         currentFs = result.newFs;

@@ -3,9 +3,12 @@ import { Layout } from '../components/Layout';
 import { useAuth } from '../lib/AuthContext';
 import { db } from '../lib/supabase';
 import { MessageCircle, ThumbsUp, Send, Plus } from 'lucide-react';
+import { useLanguage } from '../lib/LanguageContext';
+import { clsx } from 'clsx';
 
 export const Community = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [posts, setPosts] = useState<any[]>([]);
   const [showNewPost, setShowNewPost] = useState(false);
   const [newPostTitle, setNewPostTitle] = useState('');
@@ -41,13 +44,13 @@ export const Community = () => {
 
   const handleCreatePost = async () => {
     if (!newPostTitle.trim() || !newPostContent.trim()) {
-      alert('タイトルと内容を入力してください');
+      alert('タイトルと内容を入力してください'); // TODO: i18n
       return;
     }
 
     try {
       if (!user?.id) {
-        alert('ログインしてください');
+        alert(t('community.loginRequired'));
         return;
       }
 
@@ -64,7 +67,7 @@ export const Community = () => {
       fetchPosts();
     } catch (error) {
       console.error('Error creating post:', error);
-      alert('投稿に失敗しました');
+      alert(t('community.error'));
     }
   };
 
@@ -73,7 +76,7 @@ export const Community = () => {
 
     try {
       if (!user?.id) {
-        alert('ログインしてください');
+        alert(t('community.loginRequired'));
         return;
       }
 
@@ -87,13 +90,13 @@ export const Community = () => {
       setSelectedPost(null);
     } catch (error) {
       console.error('Error creating answer:', error);
-      alert('回答の投稿に失敗しました');
+      alert(t('community.error'));
     }
   };
 
   const handleToggleVote = async (postId: string) => {
     if (!user?.id) {
-      alert('ログインしてください');
+      alert(t('community.loginRequired'));
       return;
     }
     try {
@@ -106,7 +109,7 @@ export const Community = () => {
 
   const handleToggleAnswerVote = async (answerId: string) => {
     if (!user?.id) {
-      alert('ログインしてください');
+      alert(t('community.loginRequired'));
       return;
     }
     try {
@@ -118,7 +121,7 @@ export const Community = () => {
   };
 
   if (loading) {
-    return <Layout><div className="p-8">読み込み中...</div></Layout>;
+    return <Layout><div className="p-8 text-slate-500 dark:text-slate-400">{t('community.loading')}</div></Layout>;
   }
 
   return (
@@ -126,54 +129,54 @@ export const Community = () => {
       <div className="p-8 max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <MessageCircle size={32} className="text-primary-400" />
-            <h1 className="text-3xl font-bold">コミュニティQ&A</h1>
+            <MessageCircle size={32} className="text-primary-600 dark:text-primary-400" />
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('community.title')}</h1>
           </div>
           <button
             onClick={() => setShowNewPost(!showNewPost)}
-            className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors"
+            className="bg-primary-600 hover:bg-primary-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-lg shadow-primary-500/20"
           >
             <Plus size={20} />
-            質問を投稿
+            {t('community.askQuestion')}
           </button>
         </div>
 
         {/* New Post Form */}
         {showNewPost && (
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 mb-8">
-            <h3 className="text-lg font-bold mb-4">新しい質問を投稿</h3>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 mb-8 shadow-sm">
+            <h3 className="text-lg font-bold mb-4 text-slate-900 dark:text-white">{t('community.newQuestion.title')}</h3>
             <input
               type="text"
-              placeholder="タイトルを入力..."
+              placeholder={t('community.newQuestion.titlePlaceholder')}
               value={newPostTitle}
               onChange={(e) => setNewPostTitle(e.target.value)}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 mb-4"
+              className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 mb-4"
             />
             <textarea
-              placeholder="詳細を入力..."
+              placeholder={t('community.newQuestion.contentPlaceholder')}
               value={newPostContent}
               onChange={(e) => setNewPostContent(e.target.value)}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 mb-4 h-32"
+              className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 mb-4 h-32"
             />
             <input
               type="text"
-              placeholder="タグをカンマで区切って入力（例: Linux, bash, scripting）"
+              placeholder={t('community.newQuestion.tagsPlaceholder')}
               value={newPostTags}
               onChange={(e) => setNewPostTags(e.target.value)}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 mb-4"
+              className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 mb-4"
             />
             <div className="flex gap-3">
               <button
                 onClick={handleCreatePost}
-                className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-2 rounded-lg font-bold transition-colors"
+                className="bg-primary-600 hover:bg-primary-500 text-white px-6 py-2 rounded-lg font-bold transition-colors"
               >
-                投稿する
+                {t('community.newQuestion.submit')}
               </button>
               <button
                 onClick={() => setShowNewPost(false)}
-                className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-6 py-2 rounded-lg font-bold transition-colors"
+                className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-6 py-2 rounded-lg font-bold transition-colors"
               >
-                キャンセル
+                {t('community.newQuestion.cancel')}
               </button>
             </div>
           </div>
@@ -184,23 +187,25 @@ export const Community = () => {
           <div className="flex gap-3">
             <button
               onClick={() => setSortBy('newest')}
-              className={`px-4 py-2 rounded-lg font-bold transition-colors ${
+              className={clsx(
+                "px-4 py-2 rounded-lg font-bold transition-colors",
                 sortBy === 'newest'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
+                  ? 'bg-primary-600 dark:bg-primary-500 text-white'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+              )}
             >
-              最新
+              {t('community.sort.newest')}
             </button>
             <button
               onClick={() => setSortBy('popular')}
-              className={`px-4 py-2 rounded-lg font-bold transition-colors ${
+              className={clsx(
+                "px-4 py-2 rounded-lg font-bold transition-colors",
                 sortBy === 'popular'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
+                   ? 'bg-primary-600 dark:bg-primary-500 text-white'
+                   : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+              )}
             >
-              人気
+              {t('community.sort.popular')}
             </button>
           </div>
         </div>
@@ -208,101 +213,104 @@ export const Community = () => {
         {/* Posts List */}
         <div className="space-y-4">
           {posts.map(post => (
-            <div key={post.id} className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+            <div key={post.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <h3 className="text-lg font-bold mb-1">{post.title}</h3>
-                  <p className="text-sm text-slate-400">
-                    投稿者: {post.created_by} • {new Date(post.created_at).toLocaleDateString('ja-JP')}
+                  <h3 className="text-lg font-bold mb-1 text-slate-900 dark:text-white">{post.title}</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {t('community.postedBy').replace('{name}', post.created_by).replace('{date}', new Date(post.created_at).toLocaleDateString())}
                   </p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                <span className={clsx(
+                  "px-3 py-1 rounded-full text-sm font-bold",
                   post.is_solved 
-                    ? 'bg-green-500/20 text-green-400' 
-                    : 'bg-yellow-500/20 text-yellow-400'
-                }`}>
-                  {post.is_solved ? '✓ 解決済み' : '未解決'}
+                    ? 'bg-green-500/10 dark:bg-green-500/20 text-green-600 dark:text-green-400' 
+                    : 'bg-yellow-500/10 dark:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
+                )}>
+                  {post.is_solved ? t('community.solved') : t('community.unsolved')}
                 </span>
               </div>
 
-              <p className="text-slate-300 mb-4">{post.content}</p>
+              <p className="text-slate-600 dark:text-slate-300 mb-4">{post.content}</p>
 
               {post.tags && post.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {post.tags.map((tag: string) => (
-                    <span key={tag} className="px-2 py-1 bg-slate-700 text-xs font-bold rounded text-slate-300">
+                    <span key={tag} className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-xs font-bold rounded text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-transparent">
                       #{tag}
                     </span>
                   ))}
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-700">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-700">
                 <div className="flex items-center gap-4">
                   <button 
                     onClick={() => handleToggleVote(post.id)}
-                    className={`flex items-center gap-1 transition-colors group relative ${
-                      post.voters?.includes(user?.name) ? 'text-primary-400' : 'text-slate-400 hover:text-primary-400'
-                    }`}
+                    className={clsx(
+                      "flex items-center gap-1 transition-colors group relative",
+                      post.voters?.includes(user?.name) ? 'text-primary-600 dark:text-primary-400' : 'text-slate-400 hover:text-primary-500'
+                    )}
                   >
                     <ThumbsUp size={18} fill={post.voters?.includes(user?.name) ? "currentColor" : "none"} />
                     <span className="text-sm">{post.upvotes || 0}</span>
                     
                     {/* Tooltip */}
                     {post.voters && post.voters.length > 0 && (
-                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 text-[10px] py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                         {post.voters.join(', ')}
                       </div>
                     )}
                   </button>
                   <button
                     onClick={() => setSelectedPost(selectedPost?.id === post.id ? null : post)}
-                    className="flex items-center gap-1 text-slate-400 hover:text-primary-400 transition-colors"
+                    className="flex items-center gap-1 text-slate-400 hover:text-primary-500 transition-colors"
                   >
                     <MessageCircle size={18} />
-                    <span className="text-sm">{post.answers_count || 0} 回答</span>
+                    <span className="text-sm">{t('community.answers').replace('{count}', (post.answers_count || 0).toString())}</span>
                   </button>
                 </div>
               </div>
 
               {/* Answers Section */}
               {selectedPost?.id === post.id && (
-                <div className="mt-6 pt-6 border-t border-slate-700">
-                  <h4 className="font-bold mb-4">回答</h4>
+                <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                  <h4 className="font-bold mb-4 text-slate-900 dark:text-white">{t('community.answer.title')}</h4>
                   <div className="space-y-4 mb-6">
                     {post.answers && post.answers.length > 0 ? (
                       post.answers.map((answer: any) => (
-                        <div key={answer.id} className="bg-slate-900/50 rounded-lg p-4">
+                        <div key={answer.id} className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-100 dark:border-transparent">
                           <div className="flex items-start justify-between mb-2">
                             <div>
-                              <span className="text-sm font-bold text-primary-400">{answer.created_by}</span>
-                              {answer.is_accepted && <span className="ml-2 text-xs font-bold text-green-400">✓ ベストアンサー</span>}
+                              <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{answer.created_by}</span>
+                              {answer.is_accepted && <span className="ml-2 text-xs font-bold text-green-600 dark:text-green-400">✓ {t('community.answer.bestAnswer')}</span>}
                             </div>
                             <button 
                               onClick={() => handleToggleAnswerVote(answer.id)}
-                              className={`flex items-center gap-1 transition-colors group relative ${
-                                answer.voters?.includes(user?.name) ? 'text-primary-400' : 'text-slate-500 hover:text-primary-400'
-                              }`}
+                              className={clsx(
+                                "flex items-center gap-1 transition-colors group relative",
+                                answer.voters?.includes(user?.name) ? 'text-primary-600 dark:text-primary-400' : 'text-slate-400 hover:text-primary-500'
+                              )}
                             >
                               <ThumbsUp size={14} fill={answer.voters?.includes(user?.name) ? "currentColor" : "none"} />
                               <span className="text-xs">{answer.upvotes || 0}</span>
 
                               {/* Tooltip */}
                               {answer.voters && answer.voters.length > 0 && (
-                                <div className="absolute bottom-full mb-2 right-0 bg-slate-900 border border-slate-700 text-[10px] py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                <div className="absolute bottom-full mb-2 right-0 bg-slate-800 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                                   {answer.voters.join(', ')}
                                 </div>
                               )}
                             </button>
                           </div>
-                          <p className="text-slate-300">{answer.content}</p>
+                          <p className="text-slate-600 dark:text-slate-300">{answer.content}</p>
                           <p className="text-xs text-slate-500 mt-2">
-                            {new Date(answer.created_at).toLocaleDateString('ja-JP')}
+                            {new Date(answer.created_at).toLocaleDateString()}
                           </p>
                         </div>
                       ))
                     ) : (
-                      <p className="text-slate-400">回答がまだありません</p>
+                      <p className="text-slate-500 dark:text-slate-400">{t('community.noAnswers')}</p>
                     )}
                   </div>
 
@@ -310,15 +318,15 @@ export const Community = () => {
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        placeholder="回答を入力..."
+                        placeholder={t('community.answer.placeholder')}
                         value={answerText}
                         onChange={(e) => setAnswerText(e.target.value)}
-                        className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-primary-500"
+                        className="flex-1 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-primary-500"
                         onKeyPress={(e) => e.key === 'Enter' && handleCreateAnswer(post.id)}
                       />
                       <button
                         onClick={() => handleCreateAnswer(post.id)}
-                        className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg transition-colors"
+                        className="bg-primary-600 hover:bg-primary-500 text-white px-4 py-2 rounded-lg transition-colors"
                       >
                         <Send size={18} />
                       </button>
@@ -332,7 +340,7 @@ export const Community = () => {
 
         {posts.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-slate-400 text-lg">質問がまだありません。最初の質問を投稿してみてください！</p>
+            <p className="text-slate-500 dark:text-slate-400 text-lg">{t('community.noPosts')}</p>
           </div>
         )}
       </div>

@@ -146,19 +146,14 @@ export const Terminal: React.FC<TerminalProps> = ({
         return;
       }
 
-      if (cmdTrimmed === 'clear') {
-        setHistory([]);
-        setInput('');
-        return;
-      }
-      
       const result = executeCommandLine(
         cmdTrimmed,
         fs,
         cwd,
         (newFs: FileSystemNode) => setFs(newFs),
         (newCwd: string) => setCwd(newCwd),
-        oldPwd
+        oldPwd,
+        history
       );
       
       const output = result.output;

@@ -127,7 +127,16 @@ export const Demo = () => {
       fs,
       cwd,
       (newFs: FileSystemNode) => setFs(newFs),
-      (newCwd: string) => setCwd(newCwd)
+      (newCwd: string) => setCwd(newCwd),
+      undefined,
+      // Map CommandEntry to CommandHistory-like object
+      commands.map(c => ({ 
+        command: c.command, 
+        output: c.output, 
+        timestamp: Date.now(), 
+        status: 'success', 
+        cwd: cwd 
+      }))
     );
     
     const output = result.output;

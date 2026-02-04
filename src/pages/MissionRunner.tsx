@@ -8,6 +8,7 @@ import { ChevronLeft, Play, CheckCircle, HelpCircle, RotateCcw, FolderTree, Book
 import { clsx } from 'clsx';
 import { db } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
+import { useLanguage } from '../lib/LanguageContext';
 import { resolvePath, writeFile, CommandResult, executeCommandLine } from '../utils/terminalLogic';
 
 // 検証関数を生成するヘルパー
@@ -68,15 +69,15 @@ const renderFileTree = (node: FileSystemNode, path: string, depth: number = 0): 
     
     result.push(
       <div key={fullPath} className="text-xs">
-        <div className="flex items-center gap-1 py-1 px-2 rounded hover:bg-slate-700/50 transition-colors" style={{ marginLeft: `${depth * 12}px` }}>
+        <div className="flex items-center gap-1 py-1 px-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors" style={{ marginLeft: `${depth * 12}px` }}>
           {isDir ? (
-            <Folder size={14} className="text-blue-400" />
+            <Folder size={14} className="text-blue-500 dark:text-blue-400" />
           ) : name.endsWith('.zip') ? (
-            <FileArchive size={14} className="text-yellow-500" />
+            <FileArchive size={14} className="text-yellow-600 dark:text-yellow-500" />
           ) : (
-            <File size={14} className="text-slate-300" />
+            <File size={14} className="text-slate-400 dark:text-slate-300" />
           )}
-          <span className={isDir ? "text-blue-300 font-bold" : name.endsWith('.zip') ? "text-yellow-200" : "text-slate-200"}>{name}{isDir ? '/' : ''}</span>
+          <span className={isDir ? "text-blue-600 dark:text-blue-300 font-bold" : name.endsWith('.zip') ? "text-yellow-600 dark:text-yellow-200" : "text-slate-700 dark:text-slate-200"}>{name}{isDir ? '/' : ''}</span>
         </div>
         {isDir && renderFileTree(child, fullPath, depth + 1)}
       </div>
@@ -101,6 +102,7 @@ export const MissionRunner = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
+  const { t } = useLanguage();
   
   const [mission, setMission] = useState<MissionData | null>(null);
   const [loadingMission, setLoadingMission] = useState(true);
@@ -131,7 +133,7 @@ export const MissionRunner = () => {
         if (dbMission.is_locked && !isAdmin) {
           setMission(null);
           setLoadingMission(false);
-          alert('このミッションは現在ロックされています。');
+          alert(t('mission.locked'));
           navigate('/missions');
           return;
         }
@@ -182,7 +184,6 @@ export const MissionRunner = () => {
     };
 
     loadMission();
-    loadMission();
   }, [id]);
 
   // Mission ID変更時、またはミッションロード完了時にFS/CWDを初期化
@@ -203,16 +204,6 @@ export const MissionRunner = () => {
       let initialFs = JSON.parse(JSON.stringify(INITIAL_FILE_SYSTEM));
       
       if (mission.initialFileSystem) {
-         // ここでマージロジック (簡易的に上書き、または特定のパスに配置)
-         // コンテンツの型は { path: string, content: string }[] を想定
-         // TODO: 実際のデータ構造に合わせて実装。一旦は仮実装。
-         // 今回は単純なJSONツリーが渡ってくると仮定するか、
-         // Admin側で構築した { path: string, content: string }[] のリストを受け取って展開するか。
-         // ここでは Admin側で { path: string, content: string }[] を保存すると仮定し、それを適用するヘルパーを使う。
-         
-         // 循環参照回避のため、utilsなどで定義した関数を使いたいが、ここで簡易展開
-         // (resolvePath, writeFile は使える)
-         // mission.initialFileSystem は any型 (DBのJSONB)
          if (Array.isArray(mission.initialFileSystem)) {
              mission.initialFileSystem.forEach((file: { path: string, content: string }) => {
                  initialFs = writeFile(initialFs, '/', file.path, file.content, true);
@@ -312,7 +303,7 @@ export const MissionRunner = () => {
         completeMission();
       }
     } else {
-      alert("条件が満たされていません。もう一度試してください。");
+      alert(t('mission.conditionNotMet'));
     }
   };
 
@@ -377,10 +368,10 @@ export const MissionRunner = () => {
   // ローディング中
   if (loadingMission) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-100">
+      <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <div className="flex flex-col items-center gap-4">
           <Loader2 size={48} className="animate-spin text-primary-500" />
-          <p className="text-slate-400">ミッションを読み込み中...</p>
+          <p className="text-slate-500 dark:text-slate-400">{t('mission.loading')}</p>
         </div>
       </div>
     );
@@ -389,11 +380,11 @@ export const MissionRunner = () => {
   // ミッションが見つからない
   if (!mission) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-100">
+      <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">ミッションが見つかりません</h1>
-          <Link to="/missions" className="text-primary-400 hover:underline">
-            ミッション一覧に戻る
+          <h1 className="text-2xl font-bold mb-4">{t('mission.notFound')}</h1>
+          <Link to="/missions" className="text-primary-600 dark:text-primary-400 hover:underline">
+            {t('mission.returnToList')}
           </Link>
         </div>
       </div>
@@ -403,12 +394,12 @@ export const MissionRunner = () => {
   // ステップがない
   if (mission.steps.length === 0) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-950 text-slate-100">
+      <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">このミッションにはまだステップがありません</h1>
-          <p className="text-slate-400 mb-4">{mission.title}</p>
-          <Link to="/missions" className="text-primary-400 hover:underline">
-            ミッション一覧に戻る
+          <h1 className="text-2xl font-bold mb-4">{t('mission.noSteps')}</h1>
+          <p className="text-slate-500 dark:text-slate-400 mb-4">{mission.title}</p>
+          <Link to="/missions" className="text-primary-600 dark:text-primary-400 hover:underline">
+            {t('mission.returnToList')}
           </Link>
         </div>
       </div>
@@ -422,45 +413,45 @@ export const MissionRunner = () => {
       : 100;
     
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="bg-slate-800 p-8 rounded-2xl border border-primary-500/50 max-w-md w-full text-center shadow-2xl shadow-primary-500/20">
-          <div className="w-20 h-20 bg-primary-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-primary-500 animate-pulse">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-primary-500/50 max-w-md w-full text-center shadow-2xl shadow-primary-500/20">
+          <div className="w-20 h-20 bg-primary-500/10 dark:bg-primary-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-primary-600 dark:text-primary-500 animate-pulse">
             <CheckCircle size={40} />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">🎉 MISSION CLEAR!</h1>
-          <p className="text-slate-400 mb-8">{mission.title}</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">🎉 {t('mission.clear')}</h1>
+          <p className="text-slate-500 dark:text-slate-400 mb-8">{mission.title}</p>
           
           <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-slate-900 p-3 rounded-lg">
-              <div className="text-xs text-slate-500">コマンド数</div>
-              <div className="font-bold text-xl text-white">{commandLog.length}</div>
+            <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-lg">
+              <div className="text-xs text-slate-500">{t('mission.commandCount')}</div>
+              <div className="font-bold text-xl text-slate-900 dark:text-white">{commandLog.length}</div>
             </div>
-            <div className="bg-slate-900 p-3 rounded-lg">
-              <div className="text-xs text-slate-500">クリアタイム</div>
-              <div className="font-bold text-xl text-white">{Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')}</div>
+            <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-lg">
+              <div className="text-xs text-slate-500">{t('mission.clearTime')}</div>
+              <div className="font-bold text-xl text-slate-900 dark:text-white">{Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')}</div>
             </div>
-            <div className="bg-slate-900 p-3 rounded-lg">
-              <div className="text-xs text-slate-500">正確性</div>
-              <div className="font-bold text-xl text-primary-400">{successRate}%</div>
+            <div className="bg-slate-100 dark:bg-slate-900 p-3 rounded-lg">
+              <div className="text-xs text-slate-500">{t('mission.accuracy')}</div>
+              <div className="font-bold text-xl text-primary-600 dark:text-primary-400">{successRate}%</div>
             </div>
           </div>
 
-          <div className="bg-slate-900/50 p-4 rounded-xl mb-8 text-left">
+          <div className="bg-slate-100 dark:bg-slate-900/50 p-4 rounded-xl mb-8 text-left">
             <div className="flex justify-between text-sm mb-2">
-              <span className="font-bold text-white">レベルアップ!</span>
-              <span className="text-yellow-400 font-bold flex items-center gap-1"><Zap size={16}/> +{mission.xp} XP 獲得!</span>
+              <span className="font-bold text-slate-900 dark:text-white">{t('mission.levelUp')}</span>
+              <span className="text-yellow-600 dark:text-yellow-400 font-bold flex items-center gap-1"><Zap size={16}/> +{mission.xp} {t('mission.xpEarned')}</span>
             </div>
-            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
               <div className="h-full bg-primary-500 w-3/4"></div>
             </div>
           </div>
 
           <div className="flex gap-3">
-            <Link to="/missions" className="flex-1 py-3 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors">
-              ミッション一覧へ
+            <Link to="/missions" className="flex-1 py-3 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+              {t('mission.backToMissions')}
             </Link>
             <Link to="/dashboard" className="flex-1 py-3 rounded-lg bg-primary-600 text-white font-bold hover:bg-primary-500 transition-colors shadow-lg shadow-primary-500/20">
-              ダッシュボードへ &rarr;
+              {t('mission.backToDashboard')} &rarr;
             </Link>
           </div>
         </div>
@@ -469,25 +460,25 @@ export const MissionRunner = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
       {/* Header */}
-      <header className="h-14 border-b border-slate-700 flex items-center justify-between px-4 bg-slate-900 shrink-0">
+      <header className="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 bg-white dark:bg-slate-900 shrink-0 transition-colors">
         <div className="flex items-center gap-4">
-          <Link to="/missions" className="text-slate-400 hover:text-white transition-colors">
+          <Link to="/missions" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
             <ChevronLeft size={20} />
           </Link>
           <div className="flex flex-col">
-            <span className="text-xs text-slate-400">{mission.category}</span>
-            <span className="font-bold text-sm">{mission.title}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{mission.category}</span>
+            <span className="font-bold text-sm text-slate-900 dark:text-white">{mission.title}</span>
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-yellow-400 text-sm font-bold bg-yellow-400/10 px-3 py-1 rounded-full">
+          <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400 text-sm font-bold bg-yellow-400/10 px-3 py-1 rounded-full">
             <Zap size={14}/> {mission.xp} XP
           </div>
           <button 
             onClick={resetMission}
-            className="p-2 hover:bg-slate-800 rounded-full text-slate-400 transition-colors"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 transition-colors"
           >
             <RotateCcw size={20} />
           </button>
@@ -498,19 +489,19 @@ export const MissionRunner = () => {
       {/* Main Content - Split View */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel: Guide */}
-        <div className="w-1/3 border-r border-slate-700 flex flex-col bg-slate-900">
-          <div className="flex border-b border-slate-700">
+        <div className="w-1/3 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-900 transition-colors">
+          <div className="flex border-b border-slate-200 dark:border-slate-700">
             <button 
               onClick={() => setActiveTab('guide')}
-              className={clsx("flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors", activeTab === 'guide' ? "border-primary-500 text-primary-400 bg-slate-800" : "border-transparent text-slate-400 hover:text-slate-200")}
+              className={clsx("flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors", activeTab === 'guide' ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-slate-50 dark:bg-slate-800" : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}
             >
-              <BookOpen size={16} /> ガイド
+              <BookOpen size={16} /> {t('mission.guide')}
             </button>
             <button 
               onClick={() => setActiveTab('files')}
-              className={clsx("flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors", activeTab === 'files' ? "border-primary-500 text-primary-400 bg-slate-800" : "border-transparent text-slate-400 hover:text-slate-200")}
+              className={clsx("flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors", activeTab === 'files' ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-slate-50 dark:bg-slate-800" : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}
             >
-              <FolderTree size={16} /> ファイル
+              <FolderTree size={16} /> {t('mission.files')}
             </button>
           </div>
 
@@ -518,21 +509,21 @@ export const MissionRunner = () => {
             {activeTab === 'guide' ? (
               <>
                 <div className="mb-6">
-                  <div className="inline-block px-2 py-1 bg-primary-500/20 text-primary-400 text-xs font-bold rounded mb-2">
-                    Step {currentStepIndex + 1} / {mission.steps.length}
+                  <div className="inline-block px-2 py-1 bg-primary-500/10 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400 text-xs font-bold rounded mb-2">
+                    {t('mission.step')} {currentStepIndex + 1} / {mission.steps.length}
                   </div>
-                  <h2 className="text-lg font-bold mb-3">{currentStep?.title}</h2>
-                  <p className="text-slate-300 leading-relaxed text-sm">
+                  <h2 className="text-lg font-bold mb-3 text-slate-900 dark:text-white">{currentStep?.title}</h2>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-sm">
                     {currentStep?.instruction}
                   </p>
                 </div>
 
                 {showHint && currentStep?.hint && (
-                  <div className="bg-primary-900/20 border border-primary-500/30 p-4 rounded-lg mb-6 animate-in">
-                    <div className="flex items-center gap-2 text-primary-400 font-bold text-sm mb-2">
-                      <HelpCircle size={16} /> ヒント
+                  <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-500/30 p-4 rounded-lg mb-6 animate-in">
+                    <div className="flex items-center gap-2 text-primary-700 dark:text-primary-400 font-bold text-sm mb-2">
+                      <HelpCircle size={16} /> {t('mission.hint')}
                     </div>
-                    <p className="text-sm text-primary-200">{currentStep.hint}</p>
+                    <p className="text-sm text-primary-800 dark:text-primary-200">{currentStep.hint}</p>
                   </div>
                 )}
 
@@ -540,26 +531,26 @@ export const MissionRunner = () => {
                   {!showHint && currentStep?.hint && (
                     <button
                       onClick={() => setShowHint(true)}
-                      className="flex-1 py-2 px-3 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm font-medium text-slate-300 transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 py-2 px-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors flex items-center justify-center gap-2"
                     >
-                      <HelpCircle size={14} /> ヒントを表示
+                      <HelpCircle size={14} /> {t('mission.showHint')}
                     </button>
                   )}
                   <button
                     onClick={checkProgress}
                     className="flex-1 py-2 px-3 rounded-lg bg-primary-600 hover:bg-primary-500 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary-500/20"
                   >
-                    <Play size={14} /> 検証
+                    <Play size={14} /> {t('mission.verify')}
                   </button>
                 </div>
               </>
             ) : (
               <div>
-                <h3 className="font-bold text-sm mb-4 text-white">📁 ファイルシステム</h3>
-                <div className="space-y-1 text-xs font-mono bg-slate-800/30 p-3 rounded-lg max-h-96 overflow-y-auto">
+                <h3 className="font-bold text-sm mb-4 text-slate-900 dark:text-white">📁 {t('mission.fileSystem')}</h3>
+                <div className="space-y-1 text-xs font-mono bg-slate-100 dark:bg-slate-800/30 p-3 rounded-lg max-h-96 overflow-y-auto border border-slate-200 dark:border-transparent">
                   {fs && renderFileTree(fs, '')}
                   {!fs?.children || Object.keys(fs.children).length === 0 && (
-                    <div className="text-slate-500 text-center py-8">📭 ファイルなし</div>
+                    <div className="text-slate-500 text-center py-8">📭 {t('mission.noFiles')}</div>
                   )}
                 </div>
               </div>
@@ -571,7 +562,7 @@ export const MissionRunner = () => {
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 flex gap-0 min-h-0">
             {/* Terminal */}
-            <div className="flex-1 border-r border-slate-700 overflow-hidden relative">
+            <div className="flex-1 border-r border-slate-200 dark:border-slate-700 overflow-hidden relative">
               <Terminal 
                 fs={fs}
                 setFs={setFs}
@@ -591,14 +582,14 @@ export const MissionRunner = () => {
             </div>
 
             {/* GUI File Manager */}
-            <div className="w-1/2 border-l border-slate-700 bg-slate-900 flex flex-col overflow-hidden">
-              <div className="h-8 border-b border-slate-700 flex items-center px-4 bg-slate-800 gap-2">
+            <div className="w-1/2 border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex flex-col overflow-hidden transition-colors">
+              <div className="h-8 border-b border-slate-200 dark:border-slate-700 flex items-center px-4 bg-white dark:bg-slate-800 gap-2 transition-colors">
                 <div className="w-3 h-3 rounded-full bg-red-500"></div>
                 <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="ml-auto text-xs text-slate-500">File Manager</span>
+                <span className="ml-auto text-xs text-slate-500">{t('mission.fileManager')}</span>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-[#0f172a]">
+              <div className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-slate-50 dark:bg-[#0f172a] transition-colors">
                 <div className="flex items-center gap-2 text-slate-500 mb-4">
                   <span className="text-red-400">📍</span>
                   <span>{cwd}</span>
@@ -608,22 +599,23 @@ export const MissionRunner = () => {
                     currentFiles.map((file) => (
                       <div 
                         key={file.name} 
-                        className={`p-3 rounded-lg border transition-all ${
+                        className={clsx(
+                          "p-3 rounded-lg border transition-all",
                           file.type === 'directory'
-                            ? 'bg-blue-500/10 border-blue-500/30'
-                            : 'bg-slate-700/30 border-slate-600/30'
-                        }`}
+                            ? "bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30"
+                            : "bg-white dark:bg-slate-700/30 border-slate-200 dark:border-slate-600/30"
+                        )}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             {file.type === 'directory' ? (
-                              <Folder size={16} className="text-yellow-400" />
+                              <Folder size={16} className="text-yellow-500 dark:text-yellow-400" />
                             ) : file.name.endsWith('.zip') ? (
-                              <FileArchive size={16} className="text-yellow-500" />
+                              <FileArchive size={16} className="text-yellow-600 dark:text-yellow-500" />
                             ) : (
-                              <File size={16} className="text-slate-400" />
+                              <File size={16} className="text-slate-400 dark:text-slate-400" />
                             )}
-                            <span className={file.type === 'directory' ? 'text-blue-300 font-bold' : file.name.endsWith('.zip') ? 'text-yellow-200 font-semibold' : 'text-slate-200'}>
+                            <span className={file.type === 'directory' ? 'text-blue-600 dark:text-blue-300 font-bold' : file.name.endsWith('.zip') ? 'text-yellow-600 dark:text-yellow-200 font-semibold' : 'text-slate-700 dark:text-slate-200'}>
                               {file.name}
                             </span>
                           </div>
@@ -635,12 +627,12 @@ export const MissionRunner = () => {
                           <div className="mt-2 space-y-1">
                             <div className="flex items-center gap-1 text-xs text-slate-500">
                               <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                              Last modified: just now
+                              {t('mission.lastModified')}: just now
                             </div>
                             {file.content && (
-                              <div className="bg-slate-800/50 p-2 rounded text-xs whitespace-pre-wrap break-words max-h-64 overflow-y-auto font-mono">
-                                <div className="text-slate-500 mb-1">内容:</div>
-                                <div className="text-green-400">{file.content}</div>
+                              <div className="bg-slate-100 dark:bg-slate-800/50 p-2 rounded text-xs whitespace-pre-wrap break-words max-h-64 overflow-y-auto font-mono border border-slate-200 dark:border-transparent">
+                                <div className="text-slate-500 mb-1">{t('mission.content')}:</div>
+                                <div className="text-green-600 dark:text-green-400">{file.content}</div>
                               </div>
                             )}
                           </div>
@@ -648,7 +640,7 @@ export const MissionRunner = () => {
                       </div>
                     ))
                   ) : (
-                    <div className="text-slate-500 text-center py-8">📭 ディレクトリは空です</div>
+                    <div className="text-slate-500 text-center py-8">📭 {t('mission.emptyDir')}</div>
                   )}
                 </div>
               </div>
@@ -656,10 +648,10 @@ export const MissionRunner = () => {
           </div>
 
           {/* Info Bar */}
-          <div className="h-10 border-t border-slate-700 bg-slate-800/50 flex items-center px-4 text-xs text-slate-400 gap-6">
-            <span>✓ コマンド実行: {commandLog.filter(c => c.status === 'success').length}</span>
-            <span>✗ エラー: {commandLog.filter(c => c.status === 'error').length}</span>
-            <span>📂 現在のパス: {cwd}</span>
+          <div className="h-10 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 flex items-center px-4 text-xs text-slate-500 dark:text-slate-400 gap-6 transition-colors">
+            <span>✓ {t('mission.executed')}: {commandLog.filter(c => c.status === 'success').length}</span>
+            <span>✗ {t('mission.error')}: {commandLog.filter(c => c.status === 'error').length}</span>
+            <span>📂 {t('mission.currentPath')}: {cwd}</span>
           </div>
         </div>
       </div>

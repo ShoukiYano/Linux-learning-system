@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './lib/AuthContext';
+import { ThemeProvider } from './lib/ThemeContext';
+import { LanguageProvider } from './lib/LanguageContext';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { AuthCallback } from './pages/AuthCallback';
@@ -10,6 +12,7 @@ import { MissionList } from './pages/MissionList';
 import { MissionRunner } from './pages/MissionRunner';
 import { Dictionary } from './pages/Dictionary';
 import { Profile } from './pages/Profile';
+import { Settings } from './pages/Settings';
 import { Leaderboard } from './pages/Leaderboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { Admin } from './pages/Admin';
@@ -27,7 +30,9 @@ import { LearningPathDetail } from './pages/LearningPathDetail';
 const App = () => {
   return (
     <AuthProvider>
-      <Router>
+      <LanguageProvider>
+        <ThemeProvider>
+          <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
@@ -61,11 +66,13 @@ const App = () => {
           
           {/* Fallbacks */}
           <Route path="/ranking" element={<Leaderboard />} />
-          <Route path="/settings" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </Router>
+          </Router>
+        </ThemeProvider>
+      </LanguageProvider>
     </AuthProvider>
   );
 };

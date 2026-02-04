@@ -6,20 +6,23 @@ import { Lock, CheckCircle, Play, Search, Filter } from 'lucide-react';
 import { clsx } from 'clsx';
 import { db } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
+import { useLanguage } from '../lib/LanguageContext';
 import { Mission } from '../types';
 
 export const MissionList = () => {
   const { user, isAdmin } = useAuth();
+  const { t } = useLanguage();
   const [missions, setMissions] = useState<Mission[]>(MISSIONS);
   const [filteredMissions, setFilteredMissions] = useState<Mission[]>(MISSIONS);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [userMissions, setUserMissions] = useState<any[]>([]);
 
   useEffect(() => {
     // Fetch missions from Supabase
     const fetchMissions = async () => {
-      const { data, error } = await db.getMissions();
+      const { data } = await db.getMissions();
       if (data && data.length > 0) {
         setMissions(data);
       }
@@ -34,7 +37,7 @@ export const MissionList = () => {
 
   const fetchUserMissions = async () => {
     if (!user?.id) return;
-    const { data, error } = await db.getUserMissions(user.id);
+    const { data } = await db.getUserMissions(user.id);
     if (data) {
       setUserMissions(data);
     }
@@ -59,20 +62,21 @@ export const MissionList = () => {
   }, [selectedCategory, searchQuery, missions]);
 
   const categories = ['all', 'File Ops', 'Permissions', 'Network', 'Text Processing'];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const categoryLabels: { [key: string]: string } = {
-    all: 'すべて',
-    'File Ops': 'ファイル操作',
-    'Permissions': '権限管理',
-    'Network': 'ネットワーク',
-    'Text Processing': 'テキスト処理',
+    all: t('missionList.categories.all'),
+    'File Ops': t('missionList.categories.File Ops'),
+    'Permissions': t('missionList.categories.Permissions'),
+    'Network': t('missionList.categories.Network'),
+    'Text Processing': t('missionList.categories.Text Processing'),
   };
 
   return (
     <Layout>
       <div className="p-8 max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">ミッション一覧</h1>
-          <p className="text-slate-400">Linuxの基礎コマンドからシェルスクリプトまで。段階的にスキルを習得して、システム管理者を目指しましょう。</p>
+          <h1 className="text-3xl font-bold mb-2 text-slate-900 dark:text-white">{t('missionList.title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400">{t('missionList.subtitle')}</p>
         </div>
 
         {/* Filters */}
@@ -85,22 +89,22 @@ export const MissionList = () => {
                 className={clsx(
                   "px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors",
                   selectedCategory === cat
-                    ? "bg-primary-500 text-white"
-                    : "bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700"
+                    ? "bg-primary-600 dark:bg-primary-500 text-white"
+                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
                 )}
               >
-                {categoryLabels[cat]}
+                {categoryLabels[cat] || cat}
               </button>
             ))}
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500" size={18} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text" 
-              placeholder="ミッションを検索..." 
+              placeholder={t('missionList.search')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500 w-full md:w-64"
+              className="pl-10 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 w-full md:w-64"
             />
           </div>
         </div>
@@ -115,46 +119,46 @@ export const MissionList = () => {
 
             return (
               <div key={mission.id} className={clsx(
-                "rounded-xl border p-6 flex flex-col h-full transition-all duration-300",
+                "rounded-xl border p-6 flex flex-col h-full transition-all duration-300 shadow-sm dark:shadow-none",
                 isLocked 
-                  ? "bg-slate-900/50 border-slate-800 opacity-75" 
-                  : "bg-slate-800 border-slate-700 hover:border-primary-500/50 hover:shadow-lg hover:shadow-primary-500/10"
+                  ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-75" 
+                  : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary-500/50 hover:shadow-lg hover:shadow-primary-500/10"
               )}>
                 <div className="flex justify-between items-start mb-4">
                   <span className={clsx(
                     "px-2 py-1 rounded text-xs font-bold",
-                    mission.isLocked ? "bg-slate-700 text-slate-400" : "bg-primary-500/20 text-primary-400"
+                    mission.isLocked ? "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400" : "bg-primary-500/10 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400"
                   )}>
                     {mission.difficulty}
                   </span>
                   {isCompleted ? (
-                    <div className="flex items-center gap-1 text-primary-500 text-xs font-bold">
-                      <CheckCircle size={14} /> 完了
+                    <div className="flex items-center gap-1 text-primary-600 dark:text-primary-500 text-xs font-bold">
+                      <CheckCircle size={14} /> {t('missionList.status.completed')}
                     </div>
                   ) : isLocked ? (
-                    <div className="flex items-center gap-1 text-slate-500 text-xs font-bold">
-                      <Lock size={14} /> ロック
+                    <div className="flex items-center gap-1 text-slate-500 dark:text-slate-500 text-xs font-bold">
+                      <Lock size={14} /> {t('missionList.status.locked')}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1 text-yellow-400 text-xs font-bold">
-                      <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></div> 進行中
+                    <div className="flex items-center gap-1 text-yellow-500 dark:text-yellow-400 text-xs font-bold">
+                      <div className="w-2 h-2 rounded-full bg-yellow-500 dark:bg-yellow-400 animate-pulse"></div> {t('missionList.status.inProgress')}
                     </div>
                   )}
                 </div>
 
                 <div className="mb-auto">
-                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">{mission.category}</div>
-                  <h3 className="text-lg font-bold mb-2">{mission.title}</h3>
-                  <p className="text-sm text-slate-400 line-clamp-3">{mission.description}</p>
+                  <div className="text-xs text-slate-500 dark:text-slate-500 uppercase tracking-wider mb-1">{mission.category}</div>
+                  <h3 className="text-lg font-bold mb-2 text-slate-900 dark:text-white">{mission.title}</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3">{mission.description}</p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-slate-700/50">
+                <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700/50">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-yellow-400">+{mission.xp} XP</span>
+                      <span className="text-xs font-bold text-yellow-600 dark:text-yellow-400">+{mission.xp} XP</span>
                     </div>
                     {isLocked ? (
-                      <span className="text-xs text-slate-500 flex items-center gap-1"><Lock size={12}/> Lv.3 Required</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-500 flex items-center gap-1"><Lock size={12}/> Lv.3 Required</span>
                     ) : (
                       <Link 
                         to={`/missions/${mission.id}`}
@@ -172,15 +176,15 @@ export const MissionList = () => {
 
         {filteredMissions.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-slate-400 mb-2">検索結果がありません</div>
+            <div className="text-slate-500 dark:text-slate-400 mb-2">{t('missionList.noResults')}</div>
             <button 
               onClick={() => {
                 setSearchQuery('');
                 setSelectedCategory('all');
               }}
-              className="text-primary-400 hover:text-primary-300 text-sm"
+              className="text-primary-600 dark:text-primary-400 hover:text-primary-500 dark:hover:text-primary-300 text-sm"
             >
-              フィルターをリセット
+              {t('missionList.resetFilter')}
             </button>
           </div>
         )}
