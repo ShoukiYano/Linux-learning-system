@@ -59,7 +59,6 @@ const SAMPLE_COMMANDS = [
   { cmd: 'ps', desc: '実行中のプロセスを表示', category: 'general' },
   { cmd: 'date', desc: '現在の日時を表示', category: 'general' },
   { cmd: 'whoami', desc: '現在のユーザーを表示', category: 'general' },
-  { cmd: 'whoami', desc: '現在のユーザーを表示', category: 'general' },
   { cmd: 'history', desc: 'コマンド履歴を表示', category: 'general' },
   { cmd: 'zip -r backup.zip project', desc: 'ディレクトリを圧縮', category: 'general' },
   { cmd: 'unzip backup.zip', desc: 'アーカイブを展開', category: 'general' },
