@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { RotateCcw, Folder, File, Clock, FileText, ChevronRight, FileArchive } from 'lucide-react';
 import { clsx } from 'clsx';
 import { FileSystemNode } from '../types';
@@ -330,22 +331,39 @@ export const Demo = () => {
       />
       {/* Header */}
       <div className="border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary-500 rounded flex items-center justify-center text-black font-bold">&gt;_</div>
-            <span className="font-bold text-xl">L-Quest Demo</span>
+        <div className="max-w-7xl mx-auto px-4 py-3 md:px-6 md:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="w-8 h-8 bg-primary-500 rounded flex items-center justify-center text-black font-bold shrink-0">&gt;_</div>
+            <span className="font-bold text-xl hidden md:block">L-Quest Demo</span>
           </div>
-          <button
-            onClick={reset}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-bold transition-colors"
-          >
-            <RotateCcw size={16} />
-            リセット
-          </button>
+          <div className="flex items-center gap-1 md:gap-3">
+            <button
+              onClick={reset}
+              className="flex items-center gap-2 px-2 py-2 text-slate-400 hover:text-white rounded-lg text-sm font-bold transition-colors md:mr-2"
+              title="リセット"
+            >
+              <RotateCcw size={18} />
+              <span className="hidden md:inline">リセット</span>
+            </button>
+            <Link
+              to="/"
+              className="px-2 md:px-4 py-2 text-slate-300 hover:text-white font-bold text-xs md:text-sm transition-colors whitespace-nowrap"
+            >
+              <span className="md:hidden">TOP</span>
+              <span className="hidden md:inline">TOPへ戻る</span>
+            </Link>
+            <Link
+              to="/login"
+              className="px-3 md:px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-bold text-xs md:text-sm shadow-lg shadow-primary-500/20 transition-all hover:scale-105 whitespace-nowrap"
+            >
+              <span className="md:hidden">登録</span>
+              <span className="hidden md:inline">新規登録</span>
+            </Link>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-6 md:px-6 md:py-8">
         {/* Title Section */}
         <div className="text-center mb-8">
           <div className="text-primary-400 text-sm font-bold tracking-wider mb-2">INTERACTIVE DEMO</div>
@@ -361,7 +379,7 @@ export const Demo = () => {
         {/* Main Demo Area */}
         <div className="grid lg:grid-cols-2 gap-6 items-stretch mb-8">
           {/* CLI Terminal */}
-          <div id="demo-terminal" className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[500px] relative">
+          <div id="demo-terminal" className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[350px] md:h-[500px] relative">
             <div className="h-8 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -426,7 +444,7 @@ export const Demo = () => {
           </div>
 
           {/* GUI File Manager */}
-          <div id="demo-file-manager" className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[500px]">
+          <div id="demo-file-manager" className="bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden flex flex-col h-[350px] md:h-[500px]">
             <div className="h-8 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
