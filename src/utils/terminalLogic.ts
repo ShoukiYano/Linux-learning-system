@@ -152,47 +152,51 @@ export const executeCommand = (
   // --- Generic Redirection Handling ---
   let redirectTarget = '';
   let redirectAppend = false;
-  
-  // Custom parsing for redirection to handle cases like "ls > file" or "echo hello > file"
-  // We need to look for > or >> in args
-  const newArgs: string[] = [];
-  let skipNext = false;
+  let effectiveCmd = cmd;
+  let effectiveArgs = [...args];
 
-  for (let i = 0; i < args.length; i++) {
-    if (skipNext) {
-      skipNext = false;
-      continue;
+  // If the command itself is a redirection operator, e.g. "> file"
+  if (cmd === '>' || cmd === '>>') {
+    effectiveCmd = '';
+    redirectAppend = cmd === '>>';
+    if (args.length > 0) {
+      redirectTarget = args[0];
+      effectiveArgs = args.slice(1);
     }
-    const arg = args[i];
-    if (arg === '>') {
-      redirectAppend = false;
-      if (args[i+1]) {
-        redirectTarget = args[i+1];
-        skipNext = true;
-      }
-    } else if (arg === '>>') {
-      redirectAppend = true;
-      if (args[i+1]) {
-        redirectTarget = args[i+1];
-        skipNext = true;
-      }
-    } else if (arg.startsWith('>>')) {
-      redirectAppend = true;
-      redirectTarget = arg.slice(2) || (args[i+1] ? args[i+1] : '');
-      if (!arg.slice(2)) skipNext = true;
-    } else if (arg.startsWith('>')) {
-      redirectAppend = false;
-      redirectTarget = arg.slice(1) || (args[i+1] ? args[i+1] : '');
-      if (!arg.slice(1)) skipNext = true;
-    } else {
-      newArgs.push(arg);
+  } else {
+    // Look for redirection in arguments
+    const processedArgs: string[] = [];
+    let skipNext = false;
+    for (let i = 0; i < args.length; i++) {
+        if (skipNext) {
+            skipNext = false;
+            continue;
+        }
+        const arg = args[i];
+        if (arg === '>') {
+            redirectTarget = args[i+1] || '';
+            redirectAppend = false;
+            skipNext = true;
+        } else if (arg === '>>') {
+            redirectTarget = args[i+1] || '';
+            redirectAppend = true;
+            skipNext = true;
+        } else if (arg.startsWith('>>')) {
+            redirectTarget = arg.slice(2) || args[i+1] || '';
+            redirectAppend = true;
+            if (!arg.slice(2)) skipNext = true;
+        } else if (arg.startsWith('>')) {
+            redirectTarget = arg.slice(1) || args[i+1] || '';
+            redirectAppend = false;
+            if (!arg.slice(1)) skipNext = true;
+        } else {
+            processedArgs.push(arg);
+        }
+    }
+    if (redirectTarget) {
+      effectiveArgs = processedArgs;
     }
   }
-
-  // Use newArgs for the actual command execution if redirection was found
-  // Exception: echo might treat > as text if quoted, but tokenizeCommand handles quotes.
-  // We assume tokenizeCommand has already split arguments correctly.
-  const effectiveArgs = redirectTarget ? newArgs : args;
 
   // Helper to apply redirection to result
   const applyRedirection = (result: CommandResult): CommandResult => {
@@ -218,14 +222,14 @@ export const executeCommand = (
   };
 
   // Special case: just redirection like "> file" or ">> file" without a command
-  if (cmd === '' && redirectTarget) {
+  if (effectiveCmd === '' && redirectTarget) {
       return applyRedirection({ output: '', newCwd: cwd });
   }
 
   // Wrap execution to capture output for redirection
   const executeCore = (): CommandResult => {
     const args = effectiveArgs;
-    switch (cmd) {
+    switch (effectiveCmd) {
     case 'pwd':
       return { output: cwd };
     
@@ -1120,50 +1124,9 @@ export const executeCommand = (
     }
 
     case 'echo': {
-      const fullArgs = args.join(' ');
-      let text = fullArgs;
-      let targetFile = '';
-      let append = false;
-      
-      if (fullArgs.includes('>>')) {
-        const parts = fullArgs.split('>>');
-        text = parts[0];
-        targetFile = parts[1].trim();
-        append = true;
-      } else if (fullArgs.includes('>')) {
-        const parts = fullArgs.split('>');
-        text = parts[0];
-        targetFile = parts[1].trim();
-      }
-      
-      text = text.trim();
+      let text = args.join(' ');
       if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
         text = text.slice(1, -1);
-      }
-      
-      if (targetFile) {
-        const newFs = JSON.parse(JSON.stringify(fs));
-        const parts = normalizePath(cwd, targetFile).split('/');
-        const fileName = parts.pop()!;
-        const dirPath = parts.join('/') || '/';
-        const dirNode = resolvePath(newFs, '/', dirPath);
-        
-        if (dirNode && dirNode.children) {
-          if (dirNode.children[fileName] && append) {
-            dirNode.children[fileName].content = (dirNode.children[fileName].content || '') + (dirNode.children[fileName].content ? '\n' : '') + text;
-          } else {
-            dirNode.children[fileName] = {
-              name: fileName,
-              type: 'file',
-              permissions: '-rw-r--r--',
-              content: text,
-              updatedAt: new Date().toISOString()
-            };
-          }
-          return { output: '', newFs };
-        } else {
-          return { output: `bash: ${targetFile}: No such file or directory` };
-        }
       }
       return { output: text };
     }
@@ -1933,6 +1896,20 @@ export const tokenizeCommand = (cmdStr: string): string[] => {
       if (currentToken.length > 0) {
         tokens.push(currentToken);
         currentToken = '';
+      }
+    } else if ((char === '>' || char === '<' || char === '|') && !inQuotes) {
+      // Split these operators unless quoted
+      if (currentToken.length > 0) {
+        tokens.push(currentToken);
+        currentToken = '';
+      }
+      
+      // Handle >> or <<
+      if (cmdStr[i + 1] === char && (char === '>' || char === '<')) {
+        tokens.push(char + char);
+        i++;
+      } else {
+        tokens.push(char);
       }
     } else {
       currentToken += char;

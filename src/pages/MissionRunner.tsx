@@ -50,8 +50,20 @@ const createValidationFunction = (
         if (!validationParams.filePath || validationParams.fileContent === undefined) return false;
         const node = resolvePath(fs, cwd, validationParams.filePath);
         if (!node || node.type !== 'file' || typeof node.content !== 'string') return false;
+        
         // 改行や空白の扱いを少し柔軟にする（trimして比較）
-        return node.content.trim() === validationParams.fileContent.trim();
+        const actual = node.content.trim();
+        const expected = validationParams.fileContent.trim();
+
+        // プレースホルダー文字列への対応: 期待値が未編集のプレースホルダーなら、
+        // ユーザーの指示が「空にする」であれば、空であることを期待する。
+        const isPlaceholder = expected === "ファイルに含まれるべき正確な内容を入力してください";
+        if (isPlaceholder) {
+          // プレースホルダーの場合は「空」であることを条件とする（リダイレクト `>` の練習を想定）
+          return actual === "";
+        }
+        
+        return actual === expected;
       };
     default:
       return () => false;
