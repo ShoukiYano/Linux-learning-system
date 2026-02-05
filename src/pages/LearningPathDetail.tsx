@@ -50,11 +50,11 @@ export const LearningPathDetail = () => {
   return (
     <Layout>
       <div className="p-8 max-w-5xl mx-auto">
-        <Link to="/curriculum" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-6 transition-colors">
+        <Link to="/curriculum" className="inline-flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white mb-6 transition-colors">
           <ChevronLeft size={18} /> カリキュラムに戻る
         </Link>
 
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-8 border border-slate-700 mb-8 relative overflow-hidden">
+        <div className="bg-gradient-to-br from-indigo-50 to-white dark:from-slate-800 dark:to-slate-900 rounded-3xl p-8 border border-indigo-100 dark:border-slate-700 mb-8 relative overflow-hidden shadow-sm dark:shadow-none">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
           
           <div className="relative z-10">
@@ -66,19 +66,19 @@ export const LearningPathDetail = () => {
               {path.difficulty === 'beginner' ? '初級' :
                path.difficulty === 'intermediate' ? '中級' : '上級'}
             </span>
-            <h1 className="text-4xl font-bold mb-4">{path.name}</h1>
-            <p className="text-slate-300 text-lg mb-6 max-w-2xl leading-relaxed">{path.description}</p>
+            <h1 className="text-4xl font-bold mb-4 text-slate-900 dark:text-white">{path.name}</h1>
+            <p className="text-slate-600 dark:text-slate-300 text-lg mb-6 max-w-2xl leading-relaxed">{path.description}</p>
             
-            <div className="flex items-center gap-6 text-sm text-slate-400">
-              <span className="flex items-center gap-1"><BookOpen size={16}/> {path.missions?.length || 0} ミッション</span>
+            <div className="flex items-center gap-6 text-sm text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1"><BookOpen size={16}/> {path.sessions?.length || path.missions?.length || 0} ミッション</span>
               <span className="flex items-center gap-1"><CheckCircle size={16}/> 体系的な学習</span>
             </div>
           </div>
         </div>
 
-        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-slate-900 dark:text-white">
           攻略順序
-          <span className="text-sm font-normal text-slate-500">(上から順に進めることを推奨します)</span>
+          <span className="text-sm font-normal text-slate-400 dark:text-slate-500">(上から順に進めることを推奨します)</span>
         </h2>
 
         <div className="space-y-4">
@@ -92,21 +92,21 @@ export const LearningPathDetail = () => {
                 {/* Step Connector */}
                 <div className="flex flex-col items-center">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm z-10 ${
-                    isCompleted ? 'bg-primary-500 text-black' : 
-                    isLocked ? 'bg-slate-800 text-slate-500 border border-slate-700' :
-                    'bg-slate-700 text-white'
+                    isCompleted ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30' : 
+                    isLocked ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700' :
+                    'bg-slate-700 text-white dark:bg-slate-700'
                   }`}>
                     {isCompleted ? <CheckCircle size={18} /> : index + 1}
                   </div>
                   {index < path.missions.length - 1 && (
-                    <div className="w-0.5 flex-1 bg-slate-700 my-1 group-hover:bg-primary-500/30 transition-colors"></div>
+                    <div className="w-0.5 flex-1 bg-slate-200 dark:bg-slate-700 my-1 group-hover:bg-primary-500/30 transition-colors"></div>
                   )}
                 </div>
 
                 {/* Mission Card */}
-                <div className={`flex-1 p-5 rounded-2xl border transition-all mb-4 ${
-                  isLocked ? 'bg-slate-900/50 border-slate-800' :
-                  'bg-slate-800 border-slate-700 hover:border-primary-500/50'
+                <div className={`flex-1 p-5 rounded-2xl border transition-all mb-4 shadow-sm dark:shadow-none ${
+                  isLocked ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800' :
+                  'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary-500/50'
                 }`}>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -114,10 +114,10 @@ export const LearningPathDetail = () => {
                         <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{mission.category}</span>
                         {isLocked && <Lock size={12} className="text-slate-600" />}
                       </div>
-                      <h3 className={`font-bold text-lg mb-2 ${isLocked ? 'text-slate-500' : 'text-white'}`}>
+                      <h3 className={`font-bold text-lg mb-2 ${isLocked ? 'text-slate-400' : 'text-slate-900 dark:text-white'}`}>
                         {mission.title}
                       </h3>
-                      <p className="text-sm text-slate-400 line-clamp-2 mb-4">{mission.description}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">{mission.description}</p>
                       
                       <div className="flex items-center gap-4">
                         <span className="text-[10px] font-bold text-yellow-500">+{mission.xp} XP</span>
@@ -127,7 +127,7 @@ export const LearningPathDetail = () => {
 
                     <div className="ml-4 flex flex-col justify-center">
                       {isLocked ? (
-                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-600 cursor-not-allowed">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-600 cursor-not-allowed border border-slate-200 dark:border-transparent">
                           <Lock size={16} />
                         </div>
                       ) : (

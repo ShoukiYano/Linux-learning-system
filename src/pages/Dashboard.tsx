@@ -102,14 +102,14 @@ export const Dashboard = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Main Hero Card - Now emphasizing Learning Tracks */}
-          <div className="lg:col-span-2 bg-gradient-to-br from-indigo-900/40 to-slate-900 dark:from-indigo-900/40 dark:to-slate-900 bg-white dark:bg-transparent rounded-2xl p-8 border border-primary-500/20 relative overflow-hidden shadow-lg dark:shadow-none">
+          <div className="lg:col-span-2 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/40 dark:to-slate-900 rounded-2xl p-8 border border-indigo-100 dark:border-primary-500/20 relative overflow-hidden shadow-sm dark:shadow-none">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
             
             <div className="relative z-10">
               <span className="inline-block px-3 py-1 rounded-full bg-primary-500/10 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400 text-xs font-bold mb-4">
                 {t('dashboard.startPath')}
               </span>
-              <h2 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white">{t('dashboard.pathTitle')}</h2>
+              <h2 className="text-2xl font-bold mb-2 text-slate-800 dark:text-white">{t('dashboard.pathTitle')}</h2>
               <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-lg">
                 {t('dashboard.pathDesc')}
               </p>
@@ -124,12 +124,12 @@ export const Dashboard = () => {
                   const progress = pathMissionsCount > 0 ? (completedInPath / pathMissionsCount) * 100 : 0;
 
                   return (
-                    <div key={path.id} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none">
-                      <div className="text-sm font-bold mb-1 text-slate-900 dark:text-white">{path.name}</div>
+                    <div key={path.id} className="bg-white dark:bg-slate-800/50 p-4 rounded-xl border border-indigo-50 dark:border-slate-700 shadow-sm dark:shadow-none">
+                      <div className="text-sm font-bold mb-1 text-slate-800 dark:text-white">{path.name}</div>
                       <div className="text-xs text-slate-500 dark:text-slate-500 mb-3">{pathMissionsCount} {t('nav.missions')}</div>
-                      <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className="w-full h-1.5 bg-indigo-50 dark:bg-slate-700 rounded-full overflow-hidden">
                         <div 
-                          className="h-full bg-primary-500 transition-all duration-500" 
+                          className="h-full bg-primary-500 dark:bg-primary-500 transition-all duration-500" 
                           style={{ width: `${progress}%` }}
                         />
                       </div>

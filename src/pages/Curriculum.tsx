@@ -40,10 +40,10 @@ export const Curriculum = () => {
       <div className="p-8 max-w-7xl mx-auto">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
-            <GraduationCap size={32} className="text-primary-400" />
-            <h1 className="text-3xl font-bold">カリキュラム</h1>
+            <GraduationCap size={32} className="text-primary-600 dark:text-primary-400" />
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">カリキュラム</h1>
           </div>
-          <p className="text-slate-400">ミッションを目標別にまとめた「学習パス」で、体系的にスキルを習得しましょう。</p>
+          <p className="text-slate-500 dark:text-slate-400">ミッションを目標別にまとめた「学習パス」で、体系的にスキルを習得しましょう。</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -56,7 +56,7 @@ export const Curriculum = () => {
             const isCompleted = pathMissionsCount > 0 && completedInPath === pathMissionsCount;
 
             return (
-              <div key={path.id} className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden hover:border-primary-500/50 transition-all group flex flex-col">
+              <div key={path.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden hover:border-primary-500/50 transition-all group flex flex-col shadow-sm dark:shadow-none">
                 <div className="p-6 flex-1">
                   <div className="flex justify-between items-start mb-4">
                     <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
@@ -74,10 +74,10 @@ export const Curriculum = () => {
                     )}
                   </div>
 
-                  <h3 className="text-xl font-bold mb-2 group-hover:text-primary-400 transition-colors">{path.name}</h3>
-                  <p className="text-slate-400 text-sm mb-6 line-clamp-2">{path.description}</p>
+                  <h3 className="text-xl font-bold mb-2 text-slate-800 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{path.name}</h3>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm mb-6 line-clamp-2">{path.description}</p>
 
-                  <div className="flex items-center gap-4 text-xs text-slate-500 mb-6">
+                  <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-500 mb-6">
                     <span className="flex items-center gap-1"><BookOpen size={14}/> {pathMissionsCount} ミッション</span>
                     <span className="flex items-center gap-1"><Clock size={14}/> {path.estimated_hours}時間</span>
                   </div>
@@ -97,10 +97,10 @@ export const Curriculum = () => {
                   </div>
                 </div>
 
-                <div className="px-6 py-4 bg-slate-900/50 border-t border-slate-700">
+                <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700">
                   <Link 
                     to={`/curriculum/${path.id}`}
-                    className="flex items-center justify-between text-sm font-bold text-white hover:text-primary-400 transition-colors"
+                    className="flex items-center justify-between text-sm font-bold text-slate-700 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                   >
                     <span>コースを開始する</span>
                     <ChevronRight size={18} />
@@ -112,9 +112,9 @@ export const Curriculum = () => {
         </div>
 
         {paths.length === 0 && (
-          <div className="text-center py-20 bg-slate-800/30 rounded-2xl border border-dashed border-slate-700">
-            <BookOpen size={48} className="mx-auto text-slate-600 mb-4" />
-            <p className="text-slate-500">現在、公開されている学習パスはありません。</p>
+          <div className="text-center py-20 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+            <BookOpen size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+            <p className="text-slate-500 dark:text-slate-500">現在、公開されている学習パスはありません。</p>
           </div>
         )}
       </div>
