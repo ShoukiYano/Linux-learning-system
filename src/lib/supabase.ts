@@ -134,39 +134,69 @@ export const db = {
   async deleteUser(userId: string) {
     // Clear related data first to avoid foreign key constraint errors
     try {
-      // Delete activities
-      await supabase.from('activities').delete().eq('user_id', userId);
+      console.log(`Starting comprehensive delete for user: ${userId}`);
       
-      // Delete user missions progress
+      // 1. Delete simple activity/progress
+      await supabase.from('activities').delete().eq('user_id', userId);
       await supabase.from('user_missions').delete().eq('user_id', userId);
       
-      // Delete votes
+      // 2. Clear personal votes
       await supabase.from('qa_post_votes').delete().eq('user_id', userId);
       await supabase.from('qa_answer_votes').delete().eq('user_id', userId);
       await supabase.from('help_article_votes').delete().eq('user_id', userId);
       
-      // Delete user's answers
-      await supabase.from('qa_answers').delete().eq('user_id', userId);
+      // 3. Handle user's answers (delete votes on them first)
+      const { data: userAnswers } = await supabase.from('qa_answers').select('id').eq('user_id', userId);
+      if (userAnswers && userAnswers.length > 0) {
+        const answerIds = userAnswers.map(a => a.id);
+        await supabase.from('qa_answer_votes').delete().in('answer_id', answerIds);
+        await supabase.from('qa_answers').delete().in('id', answerIds);
+        console.log(`Deleted ${userAnswers.length} user answers and their votes`);
+      }
       
-      // Delete user's posts
-      // Note: We might need to delete answers to these posts first if they exist
+      // 4. Handle user's posts (delete related answers and votes)
       const { data: userPosts } = await supabase.from('qa_posts').select('id').eq('user_id', userId);
       if (userPosts && userPosts.length > 0) {
         const postIds = userPosts.map(p => p.id);
-        await supabase.from('qa_answers').delete().in('post_id', postIds);
+        
+        // Find all answers to these posts to delete their votes first
+        const { data: relatedAnswers } = await supabase.from('qa_answers').select('id').in('post_id', postIds);
+        if (relatedAnswers && relatedAnswers.length > 0) {
+          const relAnswerIds = relatedAnswers.map(a => a.id);
+          await supabase.from('qa_answer_votes').delete().in('answer_id', relAnswerIds);
+          await supabase.from('qa_answers').delete().in('id', relAnswerIds);
+        }
+        
         await supabase.from('qa_post_votes').delete().in('post_id', postIds);
         await supabase.from('qa_posts').delete().in('id', postIds);
+        console.log(`Deleted ${userPosts.length} user posts and their related content`);
       }
 
-      // Finally delete the user profile
+      // 5. Explicitly handle references in content tables
+      // Set created_by to NULL if possible, or handle accordingly
+      // We wrap these in try-catch as these columns might not always exist or be nullable
+      try {
+        await supabase.from('learning_paths').update({ created_by: null } as any).eq('created_by', userId);
+        await supabase.from('help_articles').update({ created_by: null } as any).eq('created_by', userId);
+      } catch (e) {
+        console.warn('Could not nullify created_by references, possibly non-nullable or missing column', e);
+      }
+
+      // 6. Finally delete the user profile from public.users
       const { error } = await supabase
         .from('users')
         .delete()
         .eq('id', userId);
       
+      if (error) {
+        console.error('Final delete of user record failed:', error);
+      } else {
+        console.log('User record successfully deleted from public.users');
+      }
+      
       return { error };
     } catch (err: any) {
-      console.error('Error in deleteUser cascading:', err);
+      console.error('Critical failure in deleteUser cascading logic:', err);
       return { error: err };
     }
   },
