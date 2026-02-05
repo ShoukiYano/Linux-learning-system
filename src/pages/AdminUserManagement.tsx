@@ -52,12 +52,14 @@ export const AdminUserManagement = () => {
     const { error } = await db.deleteUser(userId);
     
     if (error) {
-      setError('ユーザーの削除に失敗しました');
+      console.error('Failed to delete user:', error);
+      setError(`ユーザーの削除に失敗しました: ${error.message || '不明なエラー'}`);
       setDeletingId(null);
     } else {
       // Refresh list
       setUsers(users.filter(u => u.id !== userId));
       setDeletingId(null);
+      setError(null); // Clear any previous errors
     }
   };
 

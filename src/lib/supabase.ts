@@ -132,11 +132,43 @@ export const db = {
   },
 
   async deleteUser(userId: string) {
-    const { error } = await supabase
-      .from('users')
-      .delete()
-      .eq('id', userId);
-    return { error };
+    // Clear related data first to avoid foreign key constraint errors
+    try {
+      // Delete activities
+      await supabase.from('activities').delete().eq('user_id', userId);
+      
+      // Delete user missions progress
+      await supabase.from('user_missions').delete().eq('user_id', userId);
+      
+      // Delete votes
+      await supabase.from('qa_post_votes').delete().eq('user_id', userId);
+      await supabase.from('qa_answer_votes').delete().eq('user_id', userId);
+      await supabase.from('help_article_votes').delete().eq('user_id', userId);
+      
+      // Delete user's answers
+      await supabase.from('qa_answers').delete().eq('user_id', userId);
+      
+      // Delete user's posts
+      // Note: We might need to delete answers to these posts first if they exist
+      const { data: userPosts } = await supabase.from('qa_posts').select('id').eq('user_id', userId);
+      if (userPosts && userPosts.length > 0) {
+        const postIds = userPosts.map(p => p.id);
+        await supabase.from('qa_answers').delete().in('post_id', postIds);
+        await supabase.from('qa_post_votes').delete().in('post_id', postIds);
+        await supabase.from('qa_posts').delete().in('id', postIds);
+      }
+
+      // Finally delete the user profile
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
+      
+      return { error };
+    } catch (err: any) {
+      console.error('Error in deleteUser cascading:', err);
+      return { error: err };
+    }
   },
 
   // Missions
