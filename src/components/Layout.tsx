@@ -46,6 +46,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { icon: User, label: t('nav.profile'), path: '/profile' },
     ...(isAdmin ? [
       { icon: Shield, label: '管理者', path: '/admin' },
+      { icon: Settings, label: '設定', path: '/settings' },
       { icon: Settings, label: '管理ツール', path: '/admin/commands' },
     ] : [
       { icon: Settings, label: t('nav.settings'), path: '/settings' },

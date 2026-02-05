@@ -3,7 +3,8 @@ import { Layout } from '../components/Layout';
 import { useAuth } from '../lib/AuthContext';
 import { db } from '../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Save, X, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, ChevronUp, ChevronDown, GripVertical, BookOpen, MessageSquare, TrendingUp, HelpCircle } from 'lucide-react';
+import { clsx } from 'clsx';
 import { ValidationType, ValidationParams } from '../types';
 
 interface MissionStepFormData {
@@ -250,12 +251,12 @@ export const Admin = () => {
       case 'command_match':
         return (
           <div>
-            <label className="block text-xs font-bold mb-1 text-slate-400">完全一致コマンド</label>
+            <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">完全一致コマンド</label>
             <input
               type="text"
               value={step.validationParams.command || ''}
               onChange={(e) => updateStep(index, 'validationParams', { command: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-1 px-2 text-sm text-slate-900 dark:text-white"
               placeholder="例: pwd"
             />
           </div>
@@ -263,12 +264,12 @@ export const Admin = () => {
       case 'command_contains':
         return (
           <div>
-            <label className="block text-xs font-bold mb-1 text-slate-400">コマンドに含む文字列</label>
+            <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">コマンドに含む文字列</label>
             <input
               type="text"
               value={step.validationParams.pattern || ''}
               onChange={(e) => updateStep(index, 'validationParams', { pattern: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-1 px-2 text-sm text-slate-900 dark:text-white"
               placeholder="例: ls"
             />
           </div>
@@ -276,12 +277,12 @@ export const Admin = () => {
       case 'output_contains':
         return (
           <div>
-            <label className="block text-xs font-bold mb-1 text-slate-400">出力に含む文字列</label>
+            <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">出力に含む文字列</label>
             <input
               type="text"
               value={step.validationParams.pattern || ''}
               onChange={(e) => updateStep(index, 'validationParams', { pattern: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-1 px-2 text-sm text-slate-900 dark:text-white"
               placeholder="例: /home/student"
             />
           </div>
@@ -289,12 +290,12 @@ export const Admin = () => {
       case 'file_exists':
         return (
           <div>
-            <label className="block text-xs font-bold mb-1 text-slate-400">存在確認するファイルパス</label>
+            <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">存在確認するファイルパス</label>
             <input
               type="text"
               value={step.validationParams.filePath || ''}
               onChange={(e) => updateStep(index, 'validationParams', { filePath: e.target.value })}
-              className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-1 px-2 text-sm text-slate-900 dark:text-white"
               placeholder="例: /home/student/test.txt"
             />
           </div>
@@ -303,7 +304,7 @@ export const Admin = () => {
         return (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold mb-1 text-slate-400">対象ファイルパス</label>
+              <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">対象ファイルパス</label>
               <input
                 type="text"
                 value={step.validationParams.filePath || ''}
@@ -311,19 +312,19 @@ export const Admin = () => {
                   ...step.validationParams,
                   filePath: e.target.value 
                 })}
-                className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-1 px-2 text-sm text-slate-900 dark:text-white"
                 placeholder="例: /home/student/hello.txt"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold mb-1 text-slate-400">期待するファイル内容</label>
+              <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">期待するファイル内容</label>
               <textarea
                 value={step.validationParams.fileContent || ''}
                 onChange={(e) => updateStep(index, 'validationParams', { 
                   ...step.validationParams,
                   fileContent: e.target.value 
                 })}
-                className="w-full bg-slate-900 border border-slate-700 rounded py-1 px-2 text-sm text-white h-24 font-mono"
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-1 px-2 text-sm text-slate-900 dark:text-white h-24 font-mono"
                 placeholder="ファイルに含まれるべき正確な内容を入力してください"
               />
             </div>
@@ -341,38 +342,38 @@ export const Admin = () => {
   return (
     <Layout>
       <div className="p-8 max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">管理者ダッシュボード</h1>
+        <h1 className="text-3xl font-bold mb-8 text-slate-900 dark:text-white">管理者ダッシュボード</h1>
 
         {/* Admin Tools Menu */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
-          <Link to="/admin/missions" className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105">
+          <Link to="/admin/missions" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105 shadow-sm dark:shadow-none">
             <div className="text-2xl mb-2">📋</div>
-            <h3 className="font-bold text-sm">ミッション</h3>
+            <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">ミッション</h3>
           </Link>
-          <Link to="/admin/commands" className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105">
+          <Link to="/admin/commands" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105 shadow-sm dark:shadow-none">
             <div className="text-2xl mb-2">📖</div>
-            <h3 className="font-bold text-sm">コマンド</h3>
+            <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">コマンド</h3>
           </Link>
-          <Link to="/admin/learning-paths" className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105">
+          <Link to="/admin/learning-paths" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105 shadow-sm dark:shadow-none">
             <div className="text-2xl mb-2">🎓</div>
-            <h3 className="font-bold text-sm">学習パス</h3>
+            <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">学習パス</h3>
           </Link>
-          <Link to="/admin/help" className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105">
+          <Link to="/admin/help" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105 shadow-sm dark:shadow-none">
             <div className="text-2xl mb-2">❓</div>
-            <h3 className="font-bold text-sm">ヘルプ</h3>
+            <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">ヘルプ</h3>
           </Link>
-          <Link to="/admin/qa" className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105">
+          <Link to="/admin/qa" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105 shadow-sm dark:shadow-none">
             <div className="text-2xl mb-2">💬</div>
-            <h3 className="font-bold text-sm">Q&A</h3>
+            <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">Q&A</h3>
           </Link>
-          <Link to="/admin/maintenance" className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105">
+          <Link to="/admin/maintenance" className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 hover:border-primary-500 rounded-lg p-4 text-center transition-all transform hover:scale-105 shadow-sm dark:shadow-none">
             <div className="text-2xl mb-2">🔧</div>
-            <h3 className="font-bold text-sm">メンテナンス</h3>
+            <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">メンテナンス</h3>
           </Link>
         </div>
 
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-bold">ミッション管理</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">ミッション管理</h2>
           <button
             onClick={() => {
               setShowForm(!showForm);
@@ -390,9 +391,9 @@ export const Admin = () => {
 
         {/* Form */}
         {showForm && (
-          <div className="bg-slate-800 rounded-2xl p-8 border border-slate-700 mb-8">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-8 border border-slate-200 dark:border-slate-700 mb-8 shadow-lg">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">{editingId ? 'ミッション編集' : 'ミッション作成'}</h2>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{editingId ? 'ミッション編集' : 'ミッション作成'}</h2>
               <button
                 onClick={() => {
                   setShowForm(false);
@@ -400,7 +401,7 @@ export const Admin = () => {
                   setFormData(initialFormData);
                   setActiveStepIndex(null);
                 }}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X size={24} />
               </button>
@@ -408,26 +409,26 @@ export const Admin = () => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Basic Info Section */}
-              <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-700">
-                <h3 className="text-lg font-bold mb-4 text-primary-400">📋 基本情報</h3>
+              <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-bold mb-4 text-primary-600 dark:text-primary-400">📋 基本情報</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-bold mb-2">タイトル</label>
+                    <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">タイトル</label>
                     <input
                       type="text"
                       value={formData.title}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 transition-colors"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold mb-2">カテゴリ</label>
+                    <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">カテゴリ</label>
                     <select
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
                     >
                       <option>File Ops</option>
                       <option>Permissions</option>
@@ -437,11 +438,11 @@ export const Admin = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold mb-2">難易度</label>
+                    <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">難易度</label>
                     <select
                       value={formData.difficulty}
                       onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
                     >
                       <option>Easy</option>
                       <option>Medium</option>
@@ -451,54 +452,54 @@ export const Admin = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold mb-2">XP 報酬</label>
+                    <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">XP 報酬</label>
                     <input
                       type="number"
                       value={formData.xp}
                       onChange={(e) => setFormData({ ...formData, xp: parseInt(e.target.value) })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
                       min="10"
                       step="10"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-bold mb-2">表示順序 (小さい順)</label>
+                    <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">表示順序 (小さい順)</label>
                     <input
                       type="number"
                       value={formData.orderIndex}
                       onChange={(e) => setFormData({ ...formData, orderIndex: parseInt(e.target.value) })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
                     />
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <label className="block text-sm font-bold mb-2">説明</label>
+                  <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">説明</label>
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-white focus:outline-none focus:border-primary-500 h-24"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg py-2 px-3 text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 h-24"
                     required
                   />
                 </div>
 
-                <div className="flex items-center gap-2 mt-4">
+                <div className="flex items-center gap-2 mt-4 text-slate-700 dark:text-slate-200">
                   <input
                     type="checkbox"
                     id="isLocked"
                     checked={formData.isLocked}
                     onChange={(e) => setFormData({ ...formData, isLocked: e.target.checked })}
-                    className="rounded"
+                    className="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-primary-600"
                   />
                   <label htmlFor="isLocked" className="text-sm font-bold">ロック状態（ユーザーが実行できません）</label>
                 </div>
               </div>
 
               {/* Initial File System Section */}
-              <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-700">
+              <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold text-primary-400">📁 初期ファイルシステム</h3>
+                  <h3 className="text-lg font-bold text-primary-600 dark:text-primary-400">📁 初期ファイルシステム</h3>
                   <button
                     type="button"
                     onClick={addFile}
@@ -508,32 +509,32 @@ export const Admin = () => {
                   </button>
                 </div>
 
-                {formData.initialFileSystem.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">
+                 {formData.initialFileSystem.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 dark:text-slate-500">
                     <p>初期ファイルが設定されていません。「ファイル追加」ボタンから追加できます。</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {formData.initialFileSystem.map((file, index) => (
-                      <div key={index} className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+                      <div key={index} className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 mr-4">
                             <div className="md:col-span-2">
-                              <label className="block text-xs font-bold mb-1 text-slate-400">ファイル/フォルダパス (例: documents/hello.txt)</label>
+                              <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">ファイル/フォルダパス (例: documents/hello.txt)</label>
                               <input
                                 type="text"
                                 value={file.path}
                                 onChange={(e) => updateFile(index, 'path', e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white font-mono"
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-2 px-3 text-sm text-slate-900 dark:text-white font-mono"
                                 placeholder="path/to/item"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-bold mb-1 text-slate-400">種別</label>
+                              <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">種別</label>
                               <select
                                 value={file.type}
                                 onChange={(e) => updateFile(index, 'type', e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white focus:outline-none focus:border-primary-500"
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-2 px-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-primary-500"
                               >
                                 <option value="file">📄 ファイル</option>
                                 <option value="directory">📁 フォルダ</option>
@@ -543,24 +544,24 @@ export const Admin = () => {
                           <button
                             type="button"
                             onClick={() => removeFile(index)}
-                            className="p-2 text-red-400 hover:bg-slate-700 rounded transition-colors mt-4"
+                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-slate-700 rounded transition-colors mt-4"
                           >
                             <Trash2 size={18} />
                           </button>
                         </div>
                         {file.type === 'file' && (
                           <div>
-                            <label className="block text-xs font-bold mb-1 text-slate-400">ファイル内容</label>
+                            <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">ファイル内容</label>
                             <textarea
                               value={file.content}
                               onChange={(e) => updateFile(index, 'content', e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white h-24 font-mono whitespace-pre"
+                              className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-2 px-3 text-sm text-slate-900 dark:text-white h-24 font-mono whitespace-pre"
                               placeholder="ファイルの中身を入力..."
                             />
                           </div>
                         )}
                         {file.type === 'directory' && (
-                          <div className="py-2 px-3 bg-slate-900/30 rounded border border-dashed border-slate-700 text-xs text-slate-500 italic">
+                          <div className="py-2 px-3 bg-slate-100 dark:bg-slate-900/30 rounded border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-500 italic">
                             空のフォルダが作成されます
                           </div>
                         )}
@@ -571,9 +572,9 @@ export const Admin = () => {
               </div>
 
               {/* Steps Section */}
-              <div className="bg-slate-900/50 p-6 rounded-xl border border-slate-700">
+              <div className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold text-primary-400">📝 ミッションステップ</h3>
+                  <h3 className="text-lg font-bold text-primary-600 dark:text-primary-400">📝 ミッションステップ</h3>
                   <button
                     type="button"
                     onClick={addStep}
@@ -592,23 +593,23 @@ export const Admin = () => {
                     {formData.steps.map((step, index) => (
                       <div
                         key={index}
-                        className={`border rounded-lg overflow-hidden transition-all ${
+                        className={`border rounded-lg overflow-hidden transition-all shadow-sm ${
                           activeStepIndex === index
-                            ? 'border-primary-500 bg-slate-800'
-                            : 'border-slate-700 bg-slate-800/50'
+                            ? 'border-primary-500 bg-white dark:bg-slate-800'
+                            : 'border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50'
                         }`}
                       >
                         {/* Step Header */}
                         <div
-                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-700/50"
+                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
                           onClick={() => setActiveStepIndex(activeStepIndex === index ? null : index)}
                         >
                           <div className="flex items-center gap-3">
-                            <GripVertical size={16} className="text-slate-500" />
-                            <span className="bg-primary-500/20 text-primary-400 text-xs font-bold px-2 py-1 rounded">
+                            <GripVertical size={16} className="text-slate-400 dark:text-slate-500" />
+                            <span className="bg-primary-100 dark:bg-primary-500/20 text-primary-700 dark:text-primary-400 text-xs font-bold px-2 py-1 rounded">
                               Step {index + 1}
                             </span>
-                            <span className="font-medium text-sm">
+                            <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">
                               {step.title || '(タイトル未設定)'}
                             </span>
                           </div>
@@ -617,7 +618,7 @@ export const Admin = () => {
                               type="button"
                               onClick={(e) => { e.stopPropagation(); moveStep(index, 'up'); }}
                               disabled={index === 0}
-                              className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white disabled:opacity-30"
                             >
                               <ChevronUp size={16} />
                             </button>
@@ -625,14 +626,14 @@ export const Admin = () => {
                               type="button"
                               onClick={(e) => { e.stopPropagation(); moveStep(index, 'down'); }}
                               disabled={index === formData.steps.length - 1}
-                              className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white disabled:opacity-30"
                             >
                               <ChevronDown size={16} />
                             </button>
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); removeStep(index); }}
-                              className="p-1 text-red-400 hover:text-red-300"
+                              className="p-1 text-red-500 hover:text-red-400"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -641,27 +642,27 @@ export const Admin = () => {
 
                         {/* Step Details (Expanded) */}
                         {activeStepIndex === index && (
-                          <div className="p-4 border-t border-slate-700 space-y-4">
+                          <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
-                                <label className="block text-xs font-bold mb-1 text-slate-400">ステップタイトル</label>
+                                <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">ステップタイトル</label>
                                 <input
                                   type="text"
                                   value={step.title}
                                   onChange={(e) => updateStep(index, 'title', e.target.value)}
-                                  className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white"
+                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-2 px-3 text-sm text-slate-900 dark:text-white"
                                   placeholder="例: 現在地の確認"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-bold mb-1 text-slate-400">検証タイプ</label>
+                                <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">検証タイプ</label>
                                 <select
                                   value={step.validationType}
                                   onChange={(e) => {
                                     updateStep(index, 'validationType', e.target.value as ValidationType);
                                     updateStep(index, 'validationParams', {});
                                   }}
-                                  className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white"
+                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-2 px-3 text-sm text-slate-900 dark:text-white"
                                 >
                                   <option value="command_match">コマンド完全一致</option>
                                   <option value="command_contains">コマンド部分一致</option>
@@ -673,23 +674,23 @@ export const Admin = () => {
                             </div>
 
                             <div>
-                              <label className="block text-xs font-bold mb-1 text-slate-400">指示内容</label>
+                              <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">指示内容</label>
                               <textarea
                                 value={step.instruction}
                                 onChange={(e) => updateStep(index, 'instruction', e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white h-20"
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-2 px-3 text-sm text-slate-900 dark:text-white h-20"
                                 placeholder="例: `pwd` コマンドを使用して、現在のディレクトリパスを確認してください。"
                               />
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
-                                <label className="block text-xs font-bold mb-1 text-slate-400">ヒント（任意）</label>
+                                <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">ヒント（任意）</label>
                                 <input
                                   type="text"
                                   value={step.hint}
                                   onChange={(e) => updateStep(index, 'hint', e.target.value)}
-                                  className="w-full bg-slate-900 border border-slate-700 rounded py-2 px-3 text-sm text-white"
+                                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-2 px-3 text-sm text-slate-900 dark:text-white"
                                   placeholder="例: pwd はPrint Working Directoryの略です"
                                 />
                               </div>
@@ -730,30 +731,30 @@ export const Admin = () => {
         )}
 
         {/* Missions Table */}
-        <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-          <div className="p-6 border-b border-slate-700">
-            <h2 className="text-xl font-bold">ミッション一覧</h2>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm dark:shadow-none">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">ミッション一覧</h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-900">
+              <thead className="bg-slate-50 dark:bg-slate-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-bold">順序</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">タイトル</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">カテゴリ</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">難易度</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">XP</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">ロック</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">操作</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">順序</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">タイトル</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">カテゴリ</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">難易度</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">XP</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">ロック</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">操作</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {missions.map((mission, idx) => (
-                  <tr key={mission.id} className={idx % 2 === 0 ? 'bg-slate-800/50' : ''}>
-                    <td className="px-6 py-4 font-bold text-slate-400">#{mission.order_index}</td>
-                    <td className="px-6 py-4">{mission.title}</td>
-                    <td className="px-6 py-4">{mission.category}</td>
+                  <tr key={mission.id} className={clsx("hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors", idx % 2 === 0 ? 'bg-white dark:bg-slate-800/50' : 'bg-slate-50/30 dark:bg-slate-800/20')}>
+                    <td className="px-6 py-4 font-bold text-slate-400 dark:text-slate-500">#{mission.order_index}</td>
+                    <td className="px-6 py-4 text-slate-700 dark:text-slate-200">{mission.title}</td>
+                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{mission.category}</td>
                     <td className="px-6 py-4">
                       <span className="px-2 py-1 bg-primary-500/20 text-primary-400 rounded text-sm font-bold">
                         {mission.difficulty}

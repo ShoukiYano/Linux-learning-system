@@ -134,8 +134,8 @@ export const AdminLearningPathEditor = () => {
       <div className="p-8 max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <BookOpen size={32} className="text-primary-400" />
-            <h1 className="text-3xl font-bold">学習パス管理</h1>
+            <BookOpen size={32} className="text-primary-600 dark:text-primary-400" />
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">学習パス管理</h1>
           </div>
           {!showForm && (
             <button
@@ -150,38 +150,38 @@ export const AdminLearningPathEditor = () => {
 
         {/* Form */}
         {showForm && (
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-8 mb-8">
-            <h2 className="text-2xl font-bold mb-6">{editingPath ? '編集' : '新規作成'}</h2>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-8 mb-8 shadow-lg">
+            <h2 className="text-2xl font-bold mb-6 text-slate-900 dark:text-white">{editingPath ? '編集' : '新規作成'}</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold mb-2">学習パス名 *</label>
+                <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">学習パス名 *</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-primary-500"
+                  className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 shadow-sm dark:shadow-none"
                   placeholder="例: Bashスクリプト基礎"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold mb-2">説明</label>
+                <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">説明</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 h-24"
+                  className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-3 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-primary-500 h-24 shadow-sm dark:shadow-none"
                   placeholder="このコースについての説明を入力..."
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-sm font-bold mb-2">難易度</label>
+                  <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">難易度</label>
                   <select
                     value={formData.difficulty}
                     onChange={(e) => setFormData({ ...formData, difficulty: e.target.value as any })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500"
+                    className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 shadow-sm dark:shadow-none"
                   >
                     <option value="beginner">初級</option>
                     <option value="intermediate">中級</option>
@@ -190,43 +190,43 @@ export const AdminLearningPathEditor = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold mb-2">推定学習時間（時間）</label>
+                  <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">推定学習時間（時間）</label>
                   <input
                     type="number"
                     value={formData.estimated_hours}
                     onChange={(e) => setFormData({ ...formData, estimated_hours: parseInt(e.target.value) })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500"
+                    className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 shadow-sm dark:shadow-none"
                     min="1"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold mb-2">表示順 (小さい順)</label>
+                  <label className="block text-sm font-bold mb-2 text-slate-700 dark:text-slate-200">表示順 (小さい順)</label>
                   <input
                     type="number"
                     value={formData.order_index}
                     onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) })}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500"
+                    className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-primary-500 shadow-sm dark:shadow-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold mb-3">ミッション管理 (ドラッグ＆ドロップではなく、ボタンで並べ替え)</label>
+                <label className="block text-sm font-bold mb-3 text-slate-700 dark:text-slate-200">ミッション管理 (ドラッグ＆ドロップではなく、ボタンで並べ替え)</label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Available Missions */}
-                  <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/50">
-                    <h3 className="font-bold mb-2 text-slate-400">利用可能なミッション</h3>
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
+                    <h3 className="font-bold mb-2 text-slate-500 dark:text-slate-400 text-sm">利用可能なミッション</h3>
                     <div className="max-h-64 overflow-y-auto space-y-2">
                        {missions
                         .filter(m => !selectedMissions.includes(m.id))
                         .map(mission => (
-                          <div key={mission.id} className="flex items-center justify-between p-2 bg-slate-800 rounded border border-slate-700">
-                            <span className="text-sm truncate mr-2">{mission.title}</span>
+                          <div key={mission.id} className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none">
+                            <span className="text-sm truncate mr-2 text-slate-700 dark:text-slate-200">{mission.title}</span>
                             <button
                               type="button"
                               onClick={() => addMission(mission.id)}
-                              className="text-primary-400 hover:text-white"
+                              className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-white"
                             >
                               <Plus size={16} />
                             </button>
@@ -236,25 +236,25 @@ export const AdminLearningPathEditor = () => {
                   </div>
 
                   {/* Selected Missions */}
-                  <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/50">
-                    <h3 className="font-bold mb-2 text-primary-400">選択中のミッション (上から順に表示)</h3>
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
+                    <h3 className="font-bold mb-2 text-primary-600 dark:text-primary-400 text-sm">選択中のミッション (上から順に表示)</h3>
                     <div className="max-h-64 overflow-y-auto space-y-2">
                       {selectedMissions.length === 0 && <p className="text-sm text-slate-500">ミッションが選択されていません</p>}
                       {selectedMissions.map((missionId, index) => {
                         const mission = missions.find(m => m.id === missionId);
                         if (!mission) return null;
                         return (
-                          <div key={missionId} className="flex items-center justify-between p-2 bg-slate-800 rounded border border-primary-500/30">
+                          <div key={missionId} className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 rounded border border-primary-500/30 shadow-sm dark:shadow-none">
                             <div className="flex items-center gap-2 overflow-hidden">
-                              <span className="bg-primary-500/20 text-primary-400 text-xs font-bold px-2 py-0.5 rounded">{index + 1}</span>
-                              <span className="text-sm truncate">{mission.title}</span>
+                              <span className="bg-primary-500/20 text-primary-600 dark:text-primary-400 text-xs font-bold px-2 py-0.5 rounded">{index + 1}</span>
+                              <span className="text-sm truncate text-slate-900 dark:text-white">{mission.title}</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => moveMission(index, 'up')}
                                 disabled={index === 0}
-                                className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                                className="p-1 text-slate-400 hover:text-primary-600 dark:hover:text-white disabled:opacity-30"
                               >
                                 ▲
                               </button>
@@ -262,14 +262,14 @@ export const AdminLearningPathEditor = () => {
                                 type="button"
                                 onClick={() => moveMission(index, 'down')}
                                 disabled={index === selectedMissions.length - 1}
-                                className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                                className="p-1 text-slate-400 hover:text-primary-600 dark:hover:text-white disabled:opacity-30"
                               >
                                 ▼
                               </button>
                               <button
                                 type="button"
                                 onClick={() => removeMission(missionId)}
-                                className="p-1 text-red-400 hover:text-red-300"
+                                className="p-1 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
                               >
                                 <Trash2 size={16} />
                               </button>
@@ -282,17 +282,17 @@ export const AdminLearningPathEditor = () => {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-6 border-t border-slate-700">
+              <div className="flex gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
                 <button
                   type="submit"
-                  className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-2 rounded-lg font-bold transition-colors"
+                  className="bg-primary-600 hover:bg-primary-500 text-white px-6 py-2 rounded-lg font-bold transition-colors"
                 >
                   {editingPath ? '更新' : '作成'}
                 </button>
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-6 py-2 rounded-lg font-bold transition-colors"
+                  className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-6 py-2 rounded-lg font-bold transition-colors"
                 >
                   キャンセル
                 </button>
@@ -302,40 +302,40 @@ export const AdminLearningPathEditor = () => {
         )}
 
         {/* Paths Table */}
-        <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-          <div className="p-6 border-b border-slate-700">
-            <h2 className="text-xl font-bold">学習パス一覧（{paths.length}個）</h2>
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm dark:shadow-none">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">学習パス一覧（{paths.length}個）</h2>
           </div>
-
+ 
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-900">
+              <thead className="bg-slate-50 dark:bg-slate-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-bold">順序</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">名前</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">難易度</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">推定時間</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">説明</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold">操作</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">順序</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">名前</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">難易度</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">推定時間</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">説明</th>
+                  <th className="px-6 py-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400">操作</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {paths.map((path, idx) => (
-                  <tr key={path.id} className={idx % 2 === 0 ? 'bg-slate-800/50' : ''}>
-                    <td className="px-6 py-4 font-bold text-slate-400">#{path.order_index}</td>
-                    <td className="px-6 py-4 font-bold">{path.name}</td>
+                  <tr key={path.id} className={path.id === editingPath?.id ? 'bg-primary-50 dark:bg-primary-900/10' : (idx % 2 === 0 ? 'bg-white dark:bg-slate-800/50' : 'bg-slate-50/30 dark:bg-slate-800/20')}>
+                    <td className="px-6 py-4 font-bold text-slate-400 dark:text-slate-500">#{path.order_index}</td>
+                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{path.name}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-sm font-bold ${
-                        path.difficulty === 'beginner' ? 'bg-green-500/20 text-green-400' :
-                        path.difficulty === 'intermediate' ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-red-500/20 text-red-400'
+                        path.difficulty === 'beginner' ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
+                        path.difficulty === 'intermediate' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                        'bg-red-500/10 text-red-600 dark:text-red-400'
                       }`}>
                         {path.difficulty === 'beginner' ? '初級' :
                          path.difficulty === 'intermediate' ? '中級' : '上級'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">{path.estimated_hours}時間</td>
-                    <td className="px-6 py-4 text-sm text-slate-400 truncate max-w-xs">{path.description}</td>
+                    <td className="px-6 py-4 text-slate-700 dark:text-slate-300">{path.estimated_hours}時間</td>
+                    <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 truncate max-w-xs">{path.description}</td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
                         <button

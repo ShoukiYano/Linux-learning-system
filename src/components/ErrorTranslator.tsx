@@ -72,11 +72,11 @@ export const ErrorTranslator: React.FC<ErrorTranslatorProps> = ({ command, outpu
   if (!matchedRule) return null;
 
   return (
-    <div className="mt-2 mb-4 bg-slate-800/80 border border-slate-700/50 rounded-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="bg-primary-900/20 border-b border-primary-500/20 px-3 py-1.5 flex items-center justify-between">
+    <div className="mt-2 mb-4 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/50 rounded-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 shadow-sm dark:shadow-none">
+      <div className="bg-primary-50 dark:bg-primary-900/20 border-b border-primary-100 dark:border-primary-500/20 px-3 py-1.5 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse"></div>
-          <span className="text-xs font-bold text-primary-300 uppercase tracking-wider">AI Error Insight</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-primary-500 dark:bg-primary-400 animate-pulse"></div>
+          <span className="text-xs font-bold text-primary-700 dark:text-primary-300 uppercase tracking-wider">AI Error Insight</span>
         </div>
       </div>
       <div className="p-3 flex gap-3">
@@ -84,15 +84,15 @@ export const ErrorTranslator: React.FC<ErrorTranslatorProps> = ({ command, outpu
           {matchedRule.icon || <AlertCircle className="text-slate-400" />}
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-bold text-sm text-slate-200 mb-1 flex items-center gap-2">
+          <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200 mb-1 flex items-center gap-2">
             {matchedRule.title}
           </h4>
-          <p className="text-xs text-slate-400 mb-2 leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
             {matchedRule.description}
           </p>
-          <div className="bg-slate-900/50 rounded border border-slate-700/50 p-2 text-xs flex gap-2 items-start">
-            <ArrowRight size={14} className="text-primary-500 mt-0.5 shrink-0" />
-            <span className="text-primary-100">{matchedRule.suggestion}</span>
+          <div className="bg-slate-50 dark:bg-slate-900/50 rounded border border-slate-200 dark:border-slate-700/50 p-2 text-xs flex gap-2 items-start">
+            <ArrowRight size={14} className="text-primary-600 dark:text-primary-500 mt-0.5 shrink-0" />
+            <span className="text-slate-700 dark:text-primary-100">{matchedRule.suggestion}</span>
           </div>
         </div>
       </div>

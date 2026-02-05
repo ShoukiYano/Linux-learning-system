@@ -488,7 +488,7 @@ export const MissionRunner = () => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
       {/* Header */}
-      <header className="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 bg-white dark:bg-slate-900 shrink-0 transition-colors">
+      <header className="h-14 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 bg-white dark:bg-slate-900 shrink-0 transition-colors shadow-sm dark:shadow-none z-10">
         <div className="flex items-center gap-4">
           <Link to="/missions" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
             <ChevronLeft size={20} />
@@ -519,13 +519,23 @@ export const MissionRunner = () => {
           <div className="flex border-b border-slate-200 dark:border-slate-700">
             <button 
               onClick={() => setActiveTab('guide')}
-              className={clsx("flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors", activeTab === 'guide' ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-slate-50 dark:bg-slate-800" : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}
+              className={clsx(
+                "flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors",
+                activeTab === 'guide' 
+                  ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-white dark:bg-slate-800" 
+                  : "border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 dark:bg-slate-900/50"
+              )}
             >
               <BookOpen size={16} /> {t('mission.guide')}
             </button>
             <button 
               onClick={() => setActiveTab('files')}
-              className={clsx("flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors", activeTab === 'files' ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-slate-50 dark:bg-slate-800" : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}
+              className={clsx(
+                "flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors",
+                activeTab === 'files' 
+                  ? "border-primary-500 text-primary-600 dark:text-primary-400 bg-white dark:bg-slate-800" 
+                  : "border-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 dark:bg-slate-900/50"
+              )}
             >
               <FolderTree size={16} /> {t('mission.files')}
             </button>
@@ -609,14 +619,14 @@ export const MissionRunner = () => {
             </div>
 
             {/* GUI File Manager */}
-            <div className="w-1/2 border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex flex-col overflow-hidden transition-colors">
-              <div className="h-8 border-b border-slate-200 dark:border-slate-700 flex items-center px-4 bg-white dark:bg-slate-800 gap-2 transition-colors">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="ml-auto text-xs text-slate-500">{t('mission.fileManager')}</span>
+            <div className="w-1/2 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col overflow-hidden transition-colors">
+              <div className="h-8 border-b border-slate-200 dark:border-slate-700 flex items-center px-4 bg-slate-50 dark:bg-slate-800/80 gap-2 transition-colors">
+                <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+                <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+                <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-600"></div>
+                <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{t('mission.fileManager')}</span>
               </div>
-              <div className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-slate-50 dark:bg-[#0f172a] transition-colors">
+              <div className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-white dark:bg-[#0f172a] transition-colors">
                 <div className="flex items-center gap-2 text-slate-500 mb-4">
                   <span className="text-red-400">📍</span>
                   <span>{cwd}</span>
@@ -675,7 +685,7 @@ export const MissionRunner = () => {
           </div>
 
           {/* Info Bar */}
-          <div className="h-10 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 flex items-center px-4 text-xs text-slate-500 dark:text-slate-400 gap-6 transition-colors">
+          <div className="h-10 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center px-4 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 gap-6 transition-colors">
             <span>✓ {t('mission.executed')}: {commandLog.filter(c => c.status === 'success').length}</span>
             <span>✗ {t('mission.error')}: {commandLog.filter(c => c.status === 'error').length}</span>
             <span>📂 {t('mission.currentPath')}: {cwd}</span>

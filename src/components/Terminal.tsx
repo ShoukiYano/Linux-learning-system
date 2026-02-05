@@ -221,21 +221,21 @@ export const Terminal: React.FC<TerminalProps> = ({
 
   return (
     <div 
-      className={clsx("bg-[#0c0c0c] font-mono text-sm p-4 overflow-y-auto flex flex-col", className)}
+      className={clsx("bg-slate-50 dark:bg-[#0c0c0c] font-mono text-sm p-4 overflow-y-auto flex flex-col transition-colors", className)}
       onClick={() => inputRef.current?.focus()}
     >
-      <div className="text-slate-400 mb-2 text-xs">Last login: {new Date().toDateString()} on tty1</div>
+      <div className="text-slate-400 dark:text-slate-500 mb-2 text-xs">Last login: {new Date().toDateString()} on tty1</div>
       
       {history.map((entry, i) => (
         <div key={i} className="mb-2">
           {entry.command !== undefined && (
             <div className="flex gap-2 flex-nowrap">
-              <span className="text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{entry.cwd}$</span>
-              <span className="text-slate-100">{entry.command}</span>
+              <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{entry.cwd}$</span>
+              <span className="text-slate-800 dark:text-slate-100">{entry.command}</span>
             </div>
           )}
           {entry.output && (
-            <div className={clsx("whitespace-pre-wrap mt-1", entry.status === 'error' ? "text-red-400" : "text-slate-300")}>
+            <div className={clsx("whitespace-pre-wrap mt-1", entry.status === 'error' ? "text-red-500 dark:text-red-400" : "text-slate-600 dark:text-slate-300")}>
               {entry.output}
             </div>
           )}
@@ -246,7 +246,7 @@ export const Terminal: React.FC<TerminalProps> = ({
       ))}
 
       <div className="flex gap-2 items-center flex-nowrap">
-        <span className="text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{cwd}$</span>
+        <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{cwd}$</span>
         <input
           ref={inputRef}
           type="text"
@@ -255,7 +255,7 @@ export const Terminal: React.FC<TerminalProps> = ({
           onKeyDown={handleKeyDown}
           disabled={isExecuting}
           className={clsx(
-            "bg-transparent border-none outline-none text-slate-100 flex-1 caret-primary-500",
+            "bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 flex-1 caret-primary-500",
             isExecuting && "opacity-50 cursor-not-allowed"
           )}
           autoFocus

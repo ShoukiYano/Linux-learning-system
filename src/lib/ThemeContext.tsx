@@ -11,17 +11,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>('dark');
-
-  useEffect(() => {
-    // Initialize from localStorage or default to dark
-    const savedTheme = localStorage.getItem('lquest_theme') as Theme;
-    if (savedTheme) {
-      setThemeState(savedTheme);
-    } else {
-      setThemeState('dark');
-    }
-  }, []);
+  const [theme, setThemeState] = useState<Theme>(() => {
+    return (localStorage.getItem('lquest_theme') as Theme) || 'dark';
+  });
 
   useEffect(() => {
     const root = window.document.documentElement;
