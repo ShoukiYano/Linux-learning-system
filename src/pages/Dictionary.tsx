@@ -69,7 +69,7 @@ export const Dictionary = () => {
 
   return (
     <Layout>
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="p-4 md:p-8 max-w-6xl mx-auto pb-20 lg:pb-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2 text-slate-900 dark:text-white">📚 {t('dictionary.title')}</h1>
           <p className="text-slate-500 dark:text-slate-400">

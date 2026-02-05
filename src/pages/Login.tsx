@@ -85,7 +85,7 @@ export const Login = () => {
       </header>
 
       <div className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8 shadow-2xl">
+        <div className="w-full max-w-md bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 md:p-8 shadow-2xl">
           <div className="text-center mb-8">
             <div className="w-12 h-12 bg-slate-700 rounded-xl flex items-center justify-center mx-auto mb-4 text-primary-500">
               <Terminal size={24} />

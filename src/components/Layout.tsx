@@ -53,15 +53,23 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     ]),
   ];
 
+  // Close mobile menu when route changes
+  React.useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-dark-bg text-slate-900 dark:text-slate-100 flex font-sans transition-colors duration-200">
       {/* Mobile Menu Button */}
-      <button 
-        className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 shadow-sm"
-        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-      >
-        {isMobileMenuOpen ? <X size={24} className="text-slate-900 dark:text-white" /> : <Menu size={24} className="text-slate-900 dark:text-white" />}
-      </button>
+
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden backdrop-blur-sm"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
 
       {/* Sidebar */}
       <aside className={clsx(
@@ -111,9 +119,32 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-dark-bg relative">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-dark-bg relative pb-20 lg:pb-0">
         {children}
       </main>
+
+      {/* Bottom Navigation for Mobile */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 z-50 px-6 py-2 flex justify-between items-center pb-safe-area shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <Link to="/dashboard" className={clsx("flex flex-col items-center gap-1 p-2", location.pathname === '/dashboard' ? "text-primary-600 dark:text-primary-400" : "text-slate-400")}>
+          <LayoutDashboard size={20} />
+          <span className="text-[10px] font-bold">{t('nav.dashboard')}</span>
+        </Link>
+        <Link to="/missions" className={clsx("flex flex-col items-center gap-1 p-2", location.pathname.startsWith('/missions') ? "text-primary-600 dark:text-primary-400" : "text-slate-400")}>
+          <div className="flex items-center justify-center w-5 h-5 font-mono font-bold text-base border-2 border-current rounded leading-none">&gt;_</div>
+          <span className="text-[10px] font-bold">{t('nav.missions')}</span>
+        </Link>
+        <Link to="/leaderboard" className={clsx("flex flex-col items-center gap-1 p-2", location.pathname === '/leaderboard' ? "text-primary-600 dark:text-primary-400" : "text-slate-400")}>
+          <Award size={20} />
+          <span className="text-[10px] font-bold">{t('nav.ranking')}</span>
+        </Link>
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)}
+          className={clsx("flex flex-col items-center gap-1 p-2", isMobileMenuOpen ? "text-primary-600 dark:text-primary-400" : "text-slate-400")}
+        >
+          <Menu size={20} />
+          <span className="text-[10px] font-bold">{t('nav.menu')}</span>
+        </button>
+      </div>
     </div>
   );
 };

@@ -122,7 +122,7 @@ export const MissionList = () => {
 
   return (
     <Layout>
-      <div className="p-8 max-w-7xl mx-auto">
+      <div className="p-4 md:p-8 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-12">
           <div>
             <h1 className="text-3xl font-bold mb-2 text-slate-900 dark:text-white">{t('missionList.title')}</h1>

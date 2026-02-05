@@ -82,22 +82,22 @@ export const Dashboard = () => {
   const progressPercentage = totalMissionsCount > 0 ? Math.round((completedMissionsCount / totalMissionsCount) * 100) : 0;
 
   return (
-    <Layout>
-      <div className="p-8 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <h1 className="text-3xl font-bold mb-2 text-slate-900 dark:text-white">{t('dashboard.welcome')}、{user?.name?.split(' ')[0] || 'User'}さん</h1>
-            <p className="text-slate-500 dark:text-slate-400">{t('dashboard.subtitle')}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('dashboard.streak')}</div>
-              <div className="text-xl font-bold text-yellow-500 dark:text-yellow-400 flex items-center justify-end gap-1">
-                <Flame size={18}/> {user?.streak || 0} 日
-              </div>
-            </div>
-          </div>
+     <Layout>
+       <div className="p-4 md:p-8 max-w-7xl mx-auto">
+         {/* Header */}
+         <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-6 md:mb-8 gap-4">
+           <div>
+             <h1 className="text-2xl md:text-3xl font-bold mb-2 text-slate-900 dark:text-white">{t('dashboard.welcome')}、{user?.name?.split(' ')[0] || 'User'}さん</h1>
+             <p className="text-sm md:text-base text-slate-500 dark:text-slate-400">{t('dashboard.subtitle')}</p>
+           </div>
+           <div className="flex items-center gap-4">
+             <div className="text-right">
+               <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('dashboard.streak')}</div>
+               <div className="text-xl font-bold text-yellow-500 dark:text-yellow-400 flex items-center justify-end gap-1">
+                 <Flame size={18}/> {user?.streak || 0} 日
+               </div>
+             </div>
+           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
