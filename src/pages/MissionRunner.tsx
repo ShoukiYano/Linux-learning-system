@@ -520,8 +520,8 @@ export const MissionRunner = () => {
         {/* Left Panel: Guide */}
         <div className={clsx(
           "bg-white dark:bg-slate-900 transition-colors flex flex-col border-r border-slate-200 dark:border-slate-700",
-          // Desktop: Always visible as 1/3 width
-          "lg:w-1/3 lg:flex",
+          // Desktop: Always visible as 1/3 width, static positioning
+          "lg:w-1/3 lg:flex lg:static lg:inset-auto lg:z-auto lg:h-auto",
           // Mobile: Only visible when active tab is guide, full width, absolute positioning
           mobileActiveTab === 'guide' ? "absolute inset-0 z-20 w-full flex" : "hidden"
         )}>
@@ -606,8 +606,10 @@ export const MissionRunner = () => {
         {/* Right Panel: Terminal & GUI */}
         <div className={clsx(
           "flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950",
+          // Desktop: Always static and visible
+          "lg:static lg:inset-auto lg:flex lg:z-auto lg:w-auto lg:h-auto",
            // Mobile: Full width/height absolute if terminal or files active
-           (mobileActiveTab === 'terminal' || mobileActiveTab === 'files') ? "absolute inset-0 z-20 w-full flex" : "hidden lg:flex"
+           (mobileActiveTab === 'terminal' || mobileActiveTab === 'files') ? "absolute inset-0 z-20 w-full flex" : "hidden"
         )}>
           <div className={clsx(
             "flex-1 flex gap-0 min-h-0",
@@ -619,7 +621,7 @@ export const MissionRunner = () => {
               "border-r border-slate-200 dark:border-slate-700 overflow-hidden relative",
               "flex-1", 
               // Mobile: Only show if terminal tab is active (or on desktop always visible)
-              mobileActiveTab === 'terminal' ? "flex h-full" : "hidden lg:flex"
+              mobileActiveTab === 'terminal' ? "flex flex-col h-full" : "hidden lg:flex lg:flex-col"
             )}>
               <Terminal 
                 key={`${mission.id}-${resetKey}`}
@@ -627,6 +629,7 @@ export const MissionRunner = () => {
                 setFs={setFs}
                 onCommand={handleCommand} 
                 onCwdChange={setCwd}
+                className="flex-1 min-h-0"
               />
               {showNano && (
                 <div className="absolute inset-0 z-50">
