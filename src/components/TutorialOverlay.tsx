@@ -38,12 +38,18 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
             setTargetRect(element.getBoundingClientRect());
         }, 100);
         
-        // Update rect on resize
-        const handleResize = () => {
+        // Update rect on resize and scroll
+        const updateRect = () => {
              setTargetRect(element.getBoundingClientRect());
         };
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        
+        window.addEventListener('resize', updateRect);
+        window.addEventListener('scroll', updateRect, { capture: true, passive: true });
+        
+        return () => {
+          window.removeEventListener('resize', updateRect);
+          window.removeEventListener('scroll', updateRect, { capture: true });
+        };
       }
     } else {
       setTargetRect(null);
@@ -68,7 +74,13 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
     let left = 0;
     let transform = '';
 
-    switch (step.position) {
+    // Mobile adjustment: if screen is narrow, force bottom or center to prevent off-screen
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const effectivePosition = isMobile && (step.position === 'left' || step.position === 'right') 
+      ? 'bottom' // Force bottom on mobile for side-positioned elements
+      : step.position;
+
+    switch (effectivePosition) {
       case 'top':
         top = targetRect.top - gap;
         left = targetRect.left + targetRect.width / 2;
@@ -93,6 +105,24 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
          top = window.innerHeight / 2;
          left = window.innerWidth / 2;
          transform = 'translate(-50%, -50%)';
+    }
+
+    // Boundary check specifically for mobile bottom overflow
+    if (isMobile && effectivePosition === 'bottom') {
+       // If expanding below goes off screen, flip to top or center
+       const estimatedHeight = 250; 
+       if (top + estimatedHeight > window.innerHeight) {
+          // Try top
+          if (targetRect.top - gap - estimatedHeight > 0) {
+             top = targetRect.top - gap;
+             transform = 'translate(-50%, -100%)';
+          } else {
+             // Fallback to center
+             top = window.innerHeight / 2;
+             left = window.innerWidth / 2;
+             transform = 'translate(-50%, -50%)';
+          }
+       }
     }
 
     return { top, left, transform };
@@ -124,7 +154,7 @@ export const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
 
       {/* Tooltip Card */}
       <div
-        className="absolute bg-white dark:bg-slate-800 p-6 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 w-96 max-w-[90vw] pointer-events-auto transition-all duration-500 ease-out"
+        className="absolute bg-white dark:bg-slate-800 p-5 md:p-6 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 w-[90vw] md:w-96 max-w-[90vw] pointer-events-auto transition-all duration-500 ease-out"
         style={getTooltipStyle()}
       >
         <div className="flex justify-between items-start mb-4">

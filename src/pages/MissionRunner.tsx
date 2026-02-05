@@ -4,7 +4,7 @@ import { Terminal } from '../components/Terminal';
 import { NanoEditor } from '../components/NanoEditor';
 import { MISSIONS, INITIAL_FILE_SYSTEM } from '../constants';
 import { FileSystemNode, CommandHistory, MissionStep, ValidationType, ValidationParams } from '../types';
-import { ChevronLeft, Play, CheckCircle, HelpCircle, RotateCcw, FolderTree, BookOpen, Zap, Folder, File, Loader2, FileArchive } from 'lucide-react';
+import { ChevronLeft, Play, CheckCircle, HelpCircle, RotateCcw, FolderTree, BookOpen, Zap, Folder, File, Loader2, FileArchive, Terminal as TerminalIcon } from 'lucide-react';
 import { clsx } from 'clsx';
 import { db } from '../lib/supabase';
 import { useAuth } from '../lib/AuthContext';
@@ -146,6 +146,9 @@ export const MissionRunner = () => {
   const [activeTab, setActiveTab] = useState<'guide' | 'files'>('guide');
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [resetKey, setResetKey] = useState(0);
+
+  // Mobile Tab State
+  const [mobileActiveTab, setMobileActiveTab] = useState<'guide' | 'terminal' | 'files'>('guide');
   
   // Nano Editor State
   const [showNano, setShowNano] = useState(false);
@@ -513,9 +516,15 @@ export const MissionRunner = () => {
       </header>
 
       {/* Main Content - Split View */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* Left Panel: Guide */}
-        <div className="w-1/3 border-r border-slate-200 dark:border-slate-700 flex flex-col bg-white dark:bg-slate-900 transition-colors">
+        <div className={clsx(
+          "bg-white dark:bg-slate-900 transition-colors flex flex-col border-r border-slate-200 dark:border-slate-700",
+          // Desktop: Always visible as 1/3 width
+          "lg:w-1/3 lg:flex",
+          // Mobile: Only visible when active tab is guide, full width, absolute positioning
+          mobileActiveTab === 'guide' ? "absolute inset-0 z-20 w-full flex" : "hidden"
+        )}>
           <div className="flex border-b border-slate-200 dark:border-slate-700">
             <button 
               onClick={() => setActiveTab('guide')}
@@ -595,10 +604,23 @@ export const MissionRunner = () => {
         </div>
 
         {/* Right Panel: Terminal & GUI */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 flex gap-0 min-h-0">
+        <div className={clsx(
+          "flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950",
+           // Mobile: Full width/height absolute if terminal or files active
+           (mobileActiveTab === 'terminal' || mobileActiveTab === 'files') ? "absolute inset-0 z-20 w-full flex" : "hidden lg:flex"
+        )}>
+          <div className={clsx(
+            "flex-1 flex gap-0 min-h-0",
+             // Mobile: Stack or just show one? We control visibility of children
+             "flex-col lg:flex-row"
+          )}>
             {/* Terminal */}
-            <div className="flex-1 border-r border-slate-200 dark:border-slate-700 overflow-hidden relative">
+            <div className={clsx(
+              "border-r border-slate-200 dark:border-slate-700 overflow-hidden relative",
+              "flex-1", 
+              // Mobile: Only show if terminal tab is active (or on desktop always visible)
+              mobileActiveTab === 'terminal' ? "flex h-full" : "hidden lg:flex"
+            )}>
               <Terminal 
                 key={`${mission.id}-${resetKey}`}
                 fs={fs}
@@ -619,7 +641,13 @@ export const MissionRunner = () => {
             </div>
 
             {/* GUI File Manager */}
-            <div className="w-1/2 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col overflow-hidden transition-colors">
+            <div className={clsx(
+              "border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col overflow-hidden transition-colors",
+              // Desktop: 50% width (w-1/2) logic is replaced by flex-1 or specific width in original? Original was w-1/2.
+              "lg:w-1/2",
+              // Mobile: Full screen if files tab active
+              mobileActiveTab === 'files' ? "flex h-full w-full" : "hidden lg:flex"
+            )}>
               <div className="h-8 border-b border-slate-200 dark:border-slate-700 flex items-center px-4 bg-slate-50 dark:bg-slate-800/80 gap-2 transition-colors">
                 <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-600"></div>
                 <div className="w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-600"></div>
@@ -691,6 +719,40 @@ export const MissionRunner = () => {
             <span>📂 {t('mission.currentPath')}: {cwd}</span>
           </div>
         </div>
+      </div>
+      
+      {/* Mobile Tab Navigation */}
+      <div className="lg:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around p-2 shrink-0 z-30 pb-safe-area">
+        <button
+          onClick={() => setMobileActiveTab('guide')}
+          className={clsx(
+            "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors min-w-[64px]",
+            mobileActiveTab === 'guide' ? "text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/10" : "text-slate-500 dark:text-slate-400"
+          )}
+        >
+          <BookOpen size={20} strokeWidth={mobileActiveTab === 'guide' ? 2.5 : 2}/>
+          <span className="text-[10px] font-bold">{t('mission.guide')}</span>
+        </button>
+        <button
+          onClick={() => setMobileActiveTab('terminal')}
+          className={clsx(
+            "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors min-w-[64px]",
+            mobileActiveTab === 'terminal' ? "text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/10" : "text-slate-500 dark:text-slate-400"
+          )}
+        >
+          <TerminalIcon size={20} strokeWidth={mobileActiveTab === 'terminal' ? 2.5 : 2}/>
+          <span className="text-[10px] font-bold">Terminal</span>
+        </button>
+        <button
+          onClick={() => setMobileActiveTab('files')}
+          className={clsx(
+            "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors min-w-[64px]",
+            mobileActiveTab === 'files' ? "text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/10" : "text-slate-500 dark:text-slate-400"
+          )}
+        >
+          <FolderTree size={20} strokeWidth={mobileActiveTab === 'files' ? 2.5 : 2}/>
+          <span className="text-[10px] font-bold">{t('mission.files')}</span>
+        </button>
       </div>
     </div>
   );
