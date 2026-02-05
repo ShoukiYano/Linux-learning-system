@@ -112,7 +112,8 @@ export const Leaderboard = () => {
           <div className="text-center py-12 text-slate-500 dark:text-slate-400">{t('leaderboard.loading')}</div>
         ) : (
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-            <table className="w-full">
+            {/* Desktop View */}
+            <table className="w-full hidden md:table">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                   <th className="px-6 py-4 text-left text-sm font-bold text-slate-600 dark:text-slate-300">{t('leaderboard.rank')}</th>
@@ -163,6 +164,48 @@ export const Leaderboard = () => {
                 ))}
               </tbody>
             </table>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden">
+              {filteredUsers.map((user, idx) => (
+                <div 
+                  key={user.id} 
+                  className={clsx(
+                    "p-4 border-b border-slate-100 dark:border-slate-700/50 flex flex-col gap-3",
+                    idx < 3 ? 'bg-primary-50/30 dark:bg-slate-800/50' : ''
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 flex items-center justify-center text-xl font-bold">
+                        {getMedalEmoji(idx + 1)}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-400 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="font-medium text-slate-900 dark:text-white">{user.name}</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 pl-11">
+                    <div className="bg-slate-50 dark:bg-slate-700/30 rounded p-2 text-center">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">{t('leaderboard.level')}</div>
+                      <div className="font-bold text-blue-600 dark:text-blue-400">{user.level}</div>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-700/30 rounded p-2 text-center">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">{t('leaderboard.xp')}</div>
+                      <div className="font-bold text-primary-600 dark:text-primary-400">{user.xp}</div>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-700/30 rounded p-2 text-center">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">{t('leaderboard.streak')}</div>
+                      <div className="font-bold text-yellow-500 dark:text-yellow-400">🔥 {user.streak}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

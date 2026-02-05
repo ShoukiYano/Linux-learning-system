@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
 import { db } from '../lib/supabase';
-import { Search, ChevronRight, Command, Copy, Loader2 } from 'lucide-react';
+import { Search, Command, Copy, Loader2, X } from 'lucide-react';
 import { useLanguage } from '../lib/LanguageContext';
 import { clsx } from 'clsx';
 
@@ -24,6 +24,7 @@ export const Dictionary = () => {
   const [selectedCommand, setSelectedCommand] = useState<CommandDetail | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isDetailOpen, setIsDetailOpen] = useState(false); // Modal state
 
   useEffect(() => {
     const fetchCommands = async () => {
@@ -97,14 +98,17 @@ export const Dictionary = () => {
             <p>{t('dictionary.loading')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="max-w-4xl mx-auto">
             {/* Command List */}
-            <div className="lg:col-span-2 space-y-3">
+            <div className="space-y-3">
               {filteredDocs.length > 0 ? (
                 filteredDocs.map((doc, i) => (
                   <div
                     key={doc.id || i}
-                    onClick={() => setSelectedCommand(doc)}
+                    onClick={() => {
+                      setSelectedCommand(doc);
+                      setIsDetailOpen(true);
+                    }}
                     className={clsx(
                       "p-4 rounded-lg border cursor-pointer transition-all shadow-sm",
                       selectedCommand?.id === doc.id
@@ -113,6 +117,7 @@ export const Dictionary = () => {
                     )}
                   >
                     <div className="flex items-start justify-between mb-2">
+
                       <div className="flex items-center gap-3">
                         <code className="px-3 py-1 bg-slate-100 dark:bg-slate-900 rounded text-primary-600 dark:text-primary-400 font-bold font-mono border border-slate-200 dark:border-slate-700">
                           {doc.name}
@@ -149,66 +154,93 @@ export const Dictionary = () => {
               )}
             </div>
 
-            {/* Command Detail */}
-            <div className="lg:col-span-1">
-              {selectedCommand ? (
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 sticky top-8 shadow-sm">
-                  <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white">{selectedCommand.name}</h3>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm mb-4">{selectedCommand.description}</p>
-
-                  <div className="mb-6">
-                    <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{t('dictionary.example')}</h4>
-                    <div className="bg-slate-50 dark:bg-slate-900 rounded p-3 font-mono text-sm text-primary-600 dark:text-primary-400 mb-2 border border-slate-200 dark:border-slate-700">
-                      {selectedCommand.usage}
+            {/* Command Detail (Desktop: Sticky, Mobile: Modal) */}
+            {/* Command Detail Modal (Universal) */}
+            {isDetailOpen && selectedCommand && (
+              <div 
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+                onClick={() => setIsDetailOpen(false)}
+              >
+                <div 
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-2xl font-bold mb-1 text-slate-900 dark:text-white flex items-center gap-3">
+                          {selectedCommand.name}
+                        </h3>
+                        <p className="text-slate-600 dark:text-slate-400 text-sm">{selectedCommand.description}</p>
+                      </div>
+                      <button 
+                         onClick={() => setIsDetailOpen(false)}
+                         className="p-2 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                      >
+                        <X size={20} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => copyToClipboard(selectedCommand.usage)}
-                      className="w-full py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium flex items-center justify-center gap-2 transition-colors border border-slate-200 dark:border-transparent"
+
+                    <div className="mb-6">
+                      <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{t('dictionary.example')}</h4>
+                      <div className="bg-slate-50 dark:bg-slate-900 rounded p-3 font-mono text-sm text-primary-600 dark:text-primary-400 mb-2 border border-slate-200 dark:border-slate-700">
+                        {selectedCommand.usage}
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(selectedCommand.usage)}
+                        className="w-full py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium flex items-center justify-center gap-2 transition-colors border border-slate-200 dark:border-transparent"
+                      >
+                        {copied ? t('dictionary.copied') : t('dictionary.copy')}
+                      </button>
+                    </div>
+
+                    {selectedCommand.options && (
+                      <div className="mb-6">
+                        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{t('dictionary.options')}</h4>
+                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded p-3 text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed border border-slate-200 dark:border-slate-700">
+                          {selectedCommand.options}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mb-6 pb-6 border-b border-slate-200 dark:border-slate-700">
+                      <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{t('dictionary.category')}</h4>
+                      <p className="text-primary-600 dark:text-primary-400 text-sm">
+                        {categoryLabels[selectedCommand.category] || selectedCommand.category}
+                      </p>
+                    </div>
+
+                    {selectedCommand.tags && selectedCommand.tags.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{t('dictionary.relatedTags')}</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedCommand.tags.map(tag => (
+                            <span
+                              key={tag}
+                              onClick={() => {
+                                setSearch(tag);
+                                setIsDetailOpen(false); // Close modal on search
+                              }}
+                              className="text-xs px-2 py-1 bg-primary-50 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400 rounded cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-500/30 transition-colors border border-primary-100 dark:border-transparent"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <button 
+                      onClick={() => setIsDetailOpen(false)}
+                      className="w-full py-3 bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                     >
-                      {copied ? t('dictionary.copied') : t('dictionary.copy')}
+                      {t('common.close')} 
                     </button>
                   </div>
-
-                  {selectedCommand.options && (
-                    <div className="mb-6">
-                      <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{t('dictionary.options')}</h4>
-                      <div className="bg-slate-50 dark:bg-slate-900/50 rounded p-3 text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed border border-slate-200 dark:border-slate-700">
-                        {selectedCommand.options}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mb-6 pb-6 border-b border-slate-200 dark:border-slate-700">
-                    <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">{t('dictionary.category')}</h4>
-                    <p className="text-primary-600 dark:text-primary-400 text-sm">
-                      {categoryLabels[selectedCommand.category] || selectedCommand.category}
-                    </p>
-                  </div>
-
-                  {selectedCommand.tags && selectedCommand.tags.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{t('dictionary.relatedTags')}</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedCommand.tags.map(tag => (
-                          <span
-                            key={tag}
-                            onClick={() => setSearch(tag)}
-                            className="text-xs px-2 py-1 bg-primary-50 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400 rounded cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-500/30 transition-colors border border-primary-100 dark:border-transparent"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              ) : (
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 text-center text-slate-400 shadow-sm">
-                  <Command size={40} className="mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">{t('dictionary.selectPrompt')}</p>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
+
           </div>
         )}
 

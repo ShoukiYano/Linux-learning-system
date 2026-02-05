@@ -83,16 +83,16 @@ export const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="p-8 max-w-7xl mx-auto">
+      <div className="p-4 md:p-8 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 md:mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2 text-slate-900 dark:text-white">{t('dashboard.welcome')}、{user?.name?.split(' ')[0] || 'User'}さん</h1>
-            <p className="text-slate-500 dark:text-slate-400">{t('dashboard.subtitle')}</p>
+            <h1 className="text-2xl md:text-3xl font-bold mb-2 text-slate-900 dark:text-white">{t('dashboard.welcome')}、{user?.name?.split(' ')[0] || 'User'}さん</h1>
+            <p className="text-sm md:text-base text-slate-500 dark:text-slate-400">{t('dashboard.subtitle')}</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 self-end md:self-auto">
             <div className="text-right">
-              <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('dashboard.streak')}</div>
+              <div className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('dashboard.streak')}</div>
               <div className="text-xl font-bold text-yellow-500 dark:text-yellow-400 flex items-center justify-end gap-1">
                 <Flame size={18}/> {user?.streak || 0} 日
               </div>
