@@ -4,6 +4,7 @@ import { executeCommandLine, resolvePath, CommandResult } from '../utils/termina
 import { INITIAL_FILE_SYSTEM } from '../constants';
 import { clsx } from 'clsx';
 import { ErrorTranslator } from './ErrorTranslator';
+import { VirtualKeyboard } from './VirtualKeyboard';
 
 interface TerminalProps {
   fs?: FileSystemNode;
@@ -219,51 +220,122 @@ export const Terminal: React.FC<TerminalProps> = ({
     }
   };
 
+  // Virtual Keyboard Handlers
+  const handleVirtualKey = (key: string) => {
+    setInput(prev => prev + key);
+    inputRef.current?.focus();
+  };
+
+  const handleVirtualBS = () => {
+    setInput(prev => prev.slice(0, -1));
+    inputRef.current?.focus();
+  };
+
+  const handleVirtualEnter = () => {
+    const event = {
+        key: 'Enter',
+        preventDefault: () => {},
+    } as React.KeyboardEvent;
+    
+    handleKeyDown(event);
+    inputRef.current?.focus();
+  };
+
+  const handleVirtualLeft = () => {
+    if (inputRef.current) {
+      const pos = inputRef.current.selectionStart || 0;
+      if (pos > 0) {
+        inputRef.current.setSelectionRange(pos - 1, pos - 1);
+        inputRef.current.focus();
+      }
+    }
+  };
+
+  const handleVirtualRight = () => {
+    if (inputRef.current) {
+      const pos = inputRef.current.selectionStart || 0;
+      if (pos < input.length) {
+        inputRef.current.setSelectionRange(pos + 1, pos + 1);
+        inputRef.current.focus();
+      }
+    }
+  };
+
+  const handleVirtualNav = () => {
+    inputRef.current?.focus();
+  };
+
+  const handleVirtualTab = () => {
+    const event = {
+        key: 'Tab',
+        preventDefault: () => {},
+    } as React.KeyboardEvent;
+    
+    handleKeyDown(event);
+    inputRef.current?.focus();
+  };
+
   return (
     <div 
-      className={clsx("bg-slate-50 dark:bg-[#0c0c0c] font-mono text-sm p-4 overflow-y-auto flex flex-col transition-colors", className)}
+      className={clsx("bg-slate-50 dark:bg-[#0c0c0c] font-mono text-sm p-4 pb-0 flex flex-col transition-colors", className)}
       onClick={() => inputRef.current?.focus()}
     >
-      <div className="text-slate-400 dark:text-slate-500 mb-2 text-xs">Last login: {new Date().toDateString()} on tty1</div>
-      
-      {history.map((entry, i) => (
-        <div key={i} className="mb-2">
-          {entry.command !== undefined && (
-            <div className="flex gap-2 flex-nowrap">
-              <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{entry.cwd}$</span>
-              <span className="text-slate-800 dark:text-slate-100">{entry.command}</span>
+      <div className="flex-1 overflow-y-auto">
+        <div className="text-slate-400 dark:text-slate-500 mb-2 text-xs">Last login: {new Date().toDateString()} on tty1</div>
+        
+        {history.map((entry, i) => (
+            <div key={i} className="mb-2">
+            {entry.command !== undefined && (
+                <div className="flex gap-2 flex-nowrap">
+                <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{entry.cwd}$</span>
+                <span className="text-slate-800 dark:text-slate-100">{entry.command}</span>
+                </div>
+            )}
+            {entry.output && (
+                <div className={clsx("whitespace-pre-wrap mt-1", entry.status === 'error' ? "text-red-500 dark:text-red-400" : "text-slate-600 dark:text-slate-300")}>
+                {entry.output}
+                </div>
+            )}
+            {entry.status === 'error' && entry.output && (
+                <ErrorTranslator command={entry.command} output={typeof entry.output === 'string' ? entry.output : ''} />
+            )}
             </div>
-          )}
-          {entry.output && (
-            <div className={clsx("whitespace-pre-wrap mt-1", entry.status === 'error' ? "text-red-500 dark:text-red-400" : "text-slate-600 dark:text-slate-300")}>
-              {entry.output}
-            </div>
-          )}
-          {entry.status === 'error' && entry.output && (
-             <ErrorTranslator command={entry.command} output={typeof entry.output === 'string' ? entry.output : ''} />
-          )}
-        </div>
-      ))}
+        ))}
 
-      <div className="flex gap-2 items-center flex-nowrap">
-        <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{cwd}$</span>
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isExecuting}
-          className={clsx(
-            "bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 flex-1 caret-primary-500",
-            isExecuting && "opacity-50 cursor-not-allowed"
-          )}
-          autoFocus
-          autoComplete="off"
-          spellCheck="false"
+        <div className="flex gap-2 items-center flex-nowrap mb-4">
+            <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{cwd}$</span>
+            <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isExecuting}
+            className={clsx(
+                "bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 flex-1 caret-primary-500",
+                isExecuting && "opacity-50 cursor-not-allowed"
+            )}
+            autoFocus
+            autoComplete="off"
+            spellCheck="false"
+            />
+        </div>
+        <div ref={bottomRef} />
+      </div>
+
+       {/* Mobile Virtual Keyboard */}
+       <div className="lg:hidden mt-auto -mx-4">
+        <VirtualKeyboard
+          onKeyPress={handleVirtualKey}
+          onBS={handleVirtualBS}
+          onEnter={handleVirtualEnter}
+          onTab={handleVirtualTab}
+          onUp={handleVirtualNav}
+          onDown={handleVirtualNav}
+          onLeft={handleVirtualLeft}
+          onRight={handleVirtualRight}
         />
       </div>
-      <div ref={bottomRef} />
     </div>
   );
 };
