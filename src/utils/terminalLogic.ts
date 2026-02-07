@@ -140,6 +140,39 @@ export const parseArgs = (inputArgs: string[]) => {
   return { options, params };
 };
 
+// Helper for glob expansion (supports * and ? in the last path component)
+const expandGlob = (fs: FileSystemNode, cwd: string, pattern: string): string[] => {
+  if (!pattern.includes('*') && !pattern.includes('?')) return [pattern];
+
+  const parts = pattern.split('/');
+  const lastPart = parts.pop()!;
+  const dirPath = parts.join('/') || (pattern.startsWith('/') ? '/' : '.');
+
+  // If glob is not in the last part (e.g. docs/*.txt), we resolve the directory.
+  // If glob is in intermediate part (e.g. docs/*/file), this simple version won't handle it yet.
+  if (!lastPart.includes('*') && !lastPart.includes('?')) return [pattern];
+
+  const dirNode = resolvePath(fs, cwd, dirPath);
+  if (!dirNode || !dirNode.children) return []; // No matches
+
+  const regexStr = '^' + lastPart
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex chars
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.') + '$';
+  
+  const regex = new RegExp(regexStr);
+  const matches = Object.keys(dirNode.children).filter(name => regex.test(name));
+  
+  if (matches.length === 0) return []; // Return empty if no match, so caller can decide (bash usually passes literal if no match)
+
+  return matches.map(m => {
+    if (pattern.startsWith('/')) {
+       return dirPath === '/' ? `/${m}` : `${dirPath}/${m}`;
+    }
+    return dirPath === '.' ? m : `${dirPath}/${m}`;
+  });
+};
+
 export const executeCommand = (
   cmd: string, 
   args: string[], 
@@ -234,6 +267,10 @@ export const executeCommand = (
       return { output: cwd };
     
     case 'ls': {
+      // Pre-process args to expand globs for file arguments (not options)
+      // Note: ls implementation handles params differently, but simplistic glob expansion here helps.
+      // However, ls often takes options first.
+      // We will only modify rm for now as requested, or maybe doing it inside 'rm' case is safer.
       const { options: lsOptionsRaw, params: lsParams } = parseArgs(args);
       const opts = parseOptions(lsOptionsRaw);
       
@@ -275,12 +312,18 @@ export const executeCommand = (
       };
 
       for (const target of lsTargets) {
-        const node = resolvePath(fs, cwd, target);
-        if (!node) {
-          results.push(`ls: cannot access '${target}': No such file or directory`);
-          continue;
+        // Simple glob support for ls
+        const expanded = expandGlob(fs, cwd, target);
+        const finalTargets = expanded.length > 0 ? expanded : [target];
+        
+        for (const t of finalTargets) {
+          const node = resolvePath(fs, cwd, t);
+          if (!node) {
+            results.push(`ls: cannot access '${t}': No such file or directory`);
+            continue;
+          }
+          results.push(listDir(t, node, finalTargets.length > 1 || opts.has('R')));
         }
-        results.push(listDir(target, node, lsTargets.length > 1 || opts.has('R')));
       }
       return { output: results.join('\n') };
     }
@@ -534,7 +577,18 @@ export const executeCommand = (
       
       const newFs = JSON.parse(JSON.stringify(fs));
       
-      for (const target of rmParams) {
+      const processedTargets: string[] = [];
+      for (const p of rmParams) {
+          const matches = expandGlob(newFs, cwd, p);
+          if (matches.length > 0) {
+              processedTargets.push(...matches);
+          } else {
+              // No match found - keep as is so rm can error
+              processedTargets.push(p);
+          }
+      }
+
+      for (const target of processedTargets) {
         const parts = normalizePath(cwd, target).split('/');
         const name = parts.pop()!;
         const parentPath = parts.join('/') || '/';
@@ -548,6 +602,9 @@ export const executeCommand = (
           }
           delete parentNode.children[name];
         } else if (!opts.has('f')) {
+          // If the target had wildcards and we are here, it means we attempted deletion on expanded results (which should exist)
+          // or the literal pattern (which doesn't exist).
+          // If usage was "rm *.log" and "a.log" existed, we are deleting "a.log". If it's gone for some reason, error.
           return { output: `rm: cannot remove '${target}': No such file or directory` };
         }
       }
