@@ -32,14 +32,24 @@ export const Terminal: React.FC<TerminalProps> = ({
   const [oldPwd, setOldPwd] = useState<string | undefined>(undefined);
   const [input, setInput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = inputRef.current.scrollHeight + 'px';
+      // keep view at bottom when typing causes resize
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [input]);
 
   // Notify parent when fs or cwd changes
   useEffect(() => {
     onFsChange(fs);
   }, [fs, onFsChange]);
-
+// ... existing effects ...
   useEffect(() => {
     onCwdChange(cwd);
   }, [cwd, onCwdChange]);
@@ -48,8 +58,7 @@ export const Terminal: React.FC<TerminalProps> = ({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history]);
-
-  // Wrapper for setCwd to also call callback
+// ... existing setCwd ...
   const setCwd = (newCwd: string) => {
     if (newCwd !== cwd) setOldPwd(cwd);
     setCwdLocal(newCwd);
@@ -60,7 +69,7 @@ export const Terminal: React.FC<TerminalProps> = ({
       e.preventDefault(); // フォーカス移動を防ぐ
 
       if (!input.trim()) return;
-
+// ... (rest of Tab logic is fine, no changes needed inside) ...
       const args = input.split(' ');
       const lastArg = args[args.length - 1];
       
@@ -138,6 +147,7 @@ export const Terminal: React.FC<TerminalProps> = ({
     }
 
     if (e.key === 'Enter') {
+      e.preventDefault(); // Prevent newline in textarea
       if (isExecuting) return;
 
       const cmdTrimmed = input.trim();
@@ -146,7 +156,7 @@ export const Terminal: React.FC<TerminalProps> = ({
         setInput('');
         return;
       }
-
+// ... (rest of Enter logic is fine) ...
       const result = executeCommandLine(
         cmdTrimmed,
         fs,
@@ -220,7 +230,8 @@ export const Terminal: React.FC<TerminalProps> = ({
     }
   };
 
-  // Virtual Keyboard Handlers
+  // ... (Virtual Keyboard Handler Wrappers) ...
+
   const handleVirtualKey = (key: string) => {
     setInput(prev => prev + key);
     inputRef.current?.focus();
@@ -311,18 +322,18 @@ export const Terminal: React.FC<TerminalProps> = ({
             </div>
         ))}
 
-        <div className="flex gap-2 items-center flex-nowrap mb-4">
-            <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{cwd}$</span>
-            <input
+        <div className="flex gap-2 items-start flex-nowrap mb-4">
+            <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0 pt-[2px]">student@l-quest:{cwd}$</span>
+            <textarea
             ref={inputRef}
-            type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isExecuting}
             inputMode={isMobile ? 'none' : 'text'}
+            rows={1}
             className={clsx(
-                "bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 flex-1 caret-primary-500",
+                "bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 flex-1 caret-primary-500 resize-none overflow-hidden",
                 isExecuting && "opacity-50 cursor-not-allowed"
             )}
             autoFocus
