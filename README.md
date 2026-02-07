@@ -1,3 +1,5 @@
+### README更新中...
+
 # L-Quest: Linux Mastery Platform
 
 React + TypeScript + Tailwind CSS で構築された、Linux学習プラットフォームのフロントエンドアプリケーションです。
