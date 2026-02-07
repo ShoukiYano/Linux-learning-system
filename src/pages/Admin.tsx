@@ -20,6 +20,9 @@ interface FileEntry {
   path: string;
   content: string;
   type: 'file' | 'directory';
+  metadata?: {
+    fileType?: string;
+  };
 }
 
 interface MissionFormData {
@@ -234,7 +237,7 @@ export const Admin = () => {
     setFormData({ ...formData, initialFileSystem: newFs });
   };
 
-  const updateFile = (index: number, field: keyof FileEntry, value: string) => {
+  const updateFile = (index: number, field: keyof FileEntry, value: any) => {
     const newFs = [...formData.initialFileSystem];
     newFs[index] = { ...newFs[index], [field]: value };
     
@@ -558,6 +561,28 @@ export const Admin = () => {
                               className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-2 px-3 text-sm text-slate-900 dark:text-white h-24 font-mono whitespace-pre"
                               placeholder="ファイルの中身を入力..."
                             />
+                            
+                            <div className="mt-4">
+                              <label className="block text-xs font-bold mb-1 text-slate-500 dark:text-slate-400">
+                                Fileコマンド表示タイプ (任意)
+                                <span className="text-[10px] font-normal ml-1 text-slate-400">※fileコマンドの結果を強制的に上書きします</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={file.metadata?.fileType || ''}
+                                onChange={(e) => {
+                                  const newMetadata = { ...(file.metadata || {}) };
+                                  if (e.target.value) {
+                                    newMetadata.fileType = e.target.value;
+                                  } else {
+                                    delete newMetadata.fileType;
+                                  }
+                                  updateFile(index, 'metadata', newMetadata);
+                                }}
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded py-2 px-3 text-sm text-slate-900 dark:text-white font-mono"
+                                placeholder="例: ASCII text, PNG image data 等"
+                              />
+                            </div>
                           </div>
                         )}
                         {file.type === 'directory' && (

@@ -371,31 +371,36 @@ export const executeCommand = (
         if (node.type === 'directory') {
           typeStr = useMime ? 'inode/directory; charset=binary' : 'directory';
         } else {
-          const content = node.content || '';
-          if (content.length === 0) {
-            typeStr = useMime ? 'application/x-empty; charset=binary' : 'empty';
-          } else if (content.startsWith('#!')) {
-            typeStr = useMime ? 'text/x-shellscript; charset=us-ascii' : 'POSIX shell script, ASCII text executable';
-          } else if (isCompressed) {
-            if (uncompress) {
-              typeStr = useMime ? 'application/x-compressed-content; charset=binary' : `compressed data, contents: (simulated data inside ${nameLower})`;
-            } else {
-              if (nameLower.endsWith('.zip')) {
-                typeStr = useMime ? 'application/zip; charset=binary' : 'Zip archive data';
-              } else if (nameLower.endsWith('.bz2')) {
-                typeStr = useMime ? 'application/x-bzip2; charset=binary' : 'bzip2 compressed data';
-              } else {
-                typeStr = useMime ? 'application/gzip; charset=binary' : 'gzip compressed data';
-              }
-            }
-          } else if (nameLower.endsWith('.tar')) {
-            typeStr = useMime ? 'application/x-tar; charset=binary' : 'POSIX tar archive';
+          // Check for metadata override
+          if (node.metadata?.fileType) {
+            typeStr = node.metadata.fileType;
           } else {
-            const isASCII = /^[\x00-\x7F]*$/.test(content);
-            if (useMime) {
-              typeStr = isASCII ? 'text/plain; charset=us-ascii' : 'application/octet-stream; charset=binary';
+            const content = node.content || '';
+            if (content.length === 0) {
+              typeStr = useMime ? 'application/x-empty; charset=binary' : 'empty';
+            } else if (content.startsWith('#!')) {
+              typeStr = useMime ? 'text/x-shellscript; charset=us-ascii' : 'POSIX shell script, ASCII text executable';
+            } else if (isCompressed) {
+              if (uncompress) {
+                typeStr = useMime ? 'application/x-compressed-content; charset=binary' : `compressed data, contents: (simulated data inside ${nameLower})`;
+              } else {
+                if (nameLower.endsWith('.zip')) {
+                  typeStr = useMime ? 'application/zip; charset=binary' : 'Zip archive data';
+                } else if (nameLower.endsWith('.bz2')) {
+                  typeStr = useMime ? 'application/x-bzip2; charset=binary' : 'bzip2 compressed data';
+                } else {
+                  typeStr = useMime ? 'application/gzip; charset=binary' : 'gzip compressed data';
+                }
+              }
+            } else if (nameLower.endsWith('.tar')) {
+              typeStr = useMime ? 'application/x-tar; charset=binary' : 'POSIX tar archive';
             } else {
-              typeStr = isASCII ? 'ASCII text' : 'data';
+              const isASCII = /^[\x00-\x7F]*$/.test(content);
+              if (useMime) {
+                typeStr = isASCII ? 'text/plain; charset=us-ascii' : 'application/octet-stream; charset=binary';
+              } else {
+                typeStr = isASCII ? 'ASCII text' : 'data';
+              }
             }
           }
         }

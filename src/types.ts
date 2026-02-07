@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface User {
   id: string;
   name: string;
@@ -63,6 +65,9 @@ export interface FileSystemNode {
   permissions?: string; // e.g., "drwxr-xr-x"
   owner?: string;
   updatedAt?: string; // ISO string for modification time
+  metadata?: {
+    fileType?: string; // Override for 'file' command output
+  };
 }
 
 export interface CommandDoc {
