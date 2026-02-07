@@ -275,6 +275,15 @@ export const Terminal: React.FC<TerminalProps> = ({
     inputRef.current?.focus();
   };
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
     <div 
       className={clsx("bg-slate-50 dark:bg-[#0c0c0c] font-mono text-sm p-4 pb-0 flex flex-col transition-colors", className)}
@@ -311,6 +320,7 @@ export const Terminal: React.FC<TerminalProps> = ({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isExecuting}
+            inputMode={isMobile ? 'none' : 'text'}
             className={clsx(
                 "bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 flex-1 caret-primary-500",
                 isExecuting && "opacity-50 cursor-not-allowed"
