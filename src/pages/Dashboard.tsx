@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
-import { Terminal, ArrowRight, Flame, Target, Zap } from 'lucide-react';
+import { Terminal, ArrowRight, Flame, Target, Zap, Download, Shield } from 'lucide-react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
@@ -10,7 +10,7 @@ import { MISSIONS } from '../constants';
 import { clsx } from 'clsx';
 
 export const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { t } = useLanguage();
   const [completedMissionsCount, setCompletedMissionsCount] = useState(0);
   const [activityData, setActivityData] = useState<{ name: string; cmd: number }[]>([]);
@@ -76,6 +76,62 @@ export const Dashboard = () => {
       }));
 
       setActivityData(formattedData);
+    }
+  };
+
+
+  const handleDownloadLogs = async () => {
+    if (!isAdmin) return;
+    
+    try {
+      const { data, error } = await db.getAllActivities();
+      
+      if (error) {
+        alert('ログの取得に失敗しました');
+        console.error(error);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        alert('ログデータがありません');
+        return;
+      }
+
+      // CSVデータの作成
+      const headers = ['Timestamp', 'User ID', 'Type', 'Level', 'Command', 'Description', 'User Agent', 'Metadata'];
+      const rows = data.map(log => {
+        const metadataStr = log.metadata ? JSON.stringify(log.metadata).replace(/"/g, '""') : '';
+        return [
+          `"${log.created_at}"`,
+          `"${log.user_id}"`,
+          `"${log.type}"`,
+          `"${log.level || 'INFO'}"`,
+          `"${(log.command || '').replace(/"/g, '""')}"`,
+          `"${(log.description || '').replace(/"/g, '""')}"`,
+          `"${(log.user_agent || '').replace(/"/g, '""')}"`,
+          `"${metadataStr}"`
+        ].join(',');
+      });
+
+      const csvContent = [headers.join(','), ...rows].join('\n');
+      
+      // 文字化け防止のためのBOM付与
+      const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+      const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+      
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${dateStr}_audit_log.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error('Download failed', e);
+      alert('ダウンロード中にエラーが発生しました');
     }
   };
 
@@ -259,6 +315,26 @@ export const Dashboard = () => {
             <p className="text-slate-600 dark:text-slate-400 text-sm">{t('dashboard.dictDesc')}</p>
           </Link>
         </div>
+
+        {/* Admin Section */}
+        {isAdmin && (
+          <div className="mt-8 bg-slate-900 text-white rounded-2xl p-6 border border-slate-700 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <Shield size={24} className="text-red-500" />
+              <h3 className="text-xl font-bold">System Admin</h3>
+            </div>
+            <p className="text-slate-400 mb-6 text-sm">
+              管理者専用のメニューです。システムの監査ログをCSV形式でダウンロードできます。
+            </p>
+            <button 
+              onClick={handleDownloadLogs}
+              className="flex items-center gap-2 bg-white text-slate-900 hover:bg-slate-200 px-4 py-2 rounded-lg font-bold transition-colors text-sm"
+            >
+              <Download size={16} />
+              監査ログをダウンロード (.csv)
+            </button>
+          </div>
+        )}
       </div>
     </Layout>
   );

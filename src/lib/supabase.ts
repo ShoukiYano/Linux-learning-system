@@ -436,6 +436,8 @@ export const db = {
     missionId?: string;
     command?: string;
     description?: string;
+    metadata?: any;
+    level?: 'INFO' | 'WARN' | 'ERROR';
   }) {
     const { data, error } = await supabase
       .from('activities')
@@ -445,6 +447,9 @@ export const db = {
         mission_id: activity.missionId,
         command: activity.command,
         description: activity.description,
+        metadata: activity.metadata || {},
+        level: activity.level || 'INFO',
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -479,6 +484,18 @@ export const db = {
       .gte('created_at', lastWeek.toISOString())
       .order('created_at', { ascending: true });
     
+    return { data, error };
+  },
+
+  /**
+   * 全アクティビティログを取得（管理者用・ダウンロード用）
+   */
+  async getAllActivities() {
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1000); // 一旦1000件制限。必要に応じてページネーションや制限解除を検討
     return { data, error };
   },
 

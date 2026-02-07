@@ -307,7 +307,14 @@ export const MissionRunner = () => {
         type: 'command_execution',
         missionId: mission?.id,
         command: cmd,
-        description: `コマンド実行: ${cmd}`
+        description: `コマンド実行: ${cmd}`,
+        level: newCommand.status === 'error' ? 'ERROR' : 'INFO',
+        metadata: {
+          status: newCommand.status,
+          cwd: cwd,
+          output_preview: output.slice(0, 200), // Log first 200 chars of output
+          error: newCommand.status === 'error' ? output : undefined
+        }
       });
     }
   };
@@ -350,7 +357,15 @@ export const MissionRunner = () => {
       await db.logActivity(user.id, {
         type: 'mission_completed',
         missionId: mission.id,
-        description: `${mission.title} をクリア (${commandLog.length}コマンド, ${Math.round(elapsedTime / 1000)}秒)`
+        description: `${mission.title} をクリア (${commandLog.length}コマンド, ${Math.round(elapsedTime / 1000)}秒)`,
+        level: 'INFO',
+        metadata: {
+          duration_seconds: Math.round(elapsedTime / 1000),
+          command_count: commandLog.length,
+          success_rate: commandLog.length > 0 
+            ? Math.round((commandLog.filter(c => c.status === 'success').length / commandLog.length) * 100)
+            : 100
+        }
       });
     }
   };
