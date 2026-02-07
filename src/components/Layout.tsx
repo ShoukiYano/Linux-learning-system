@@ -238,7 +238,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           className={clsx("flex flex-col items-center gap-1 p-2", isMobileMenuOpen ? "text-primary-600 dark:text-primary-400" : "text-slate-400")}
         >
           <Menu size={20} />
-          <span className="text-[10px] font-bold">{t('nav.menu')}</span>
+          <span className="text-[10px] font-bold">{t('メニュー')}</span>
         </button>
       </div>
     </div>
