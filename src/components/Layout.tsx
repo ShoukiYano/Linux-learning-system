@@ -5,15 +5,30 @@ import { clsx } from 'clsx';
 import { useAuth } from '../lib/AuthContext';
 import { useLanguage } from '../lib/LanguageContext';
 
+/**
+ * LayoutProps
+ * レイアウトコンポーネントのプロパティ
+ */
 interface LayoutProps {
+  /** 
+   * メインコンテンツとして表示する子要素
+   * ReactRouterの<Outlet />やページコンポーネントが渡されます
+   */
   children: React.ReactNode;
 }
 
+/**
+ * SidebarItem Component
+ * 
+ * サイドバー（および将来的なメニュー）で使用する個別のナビゲーション項目
+ * 現在のパスと一致する場合にアクティブスタイルを適用します
+ */
 const SidebarItem = ({ icon: Icon, label, to, active }: { icon: any, label: string, to: string, active: boolean }) => (
   <Link
     to={to}
     className={clsx(
       "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
+      // アクティブ状態と非アクティブ状態でスタイルを切り替え
       active 
         ? "bg-primary-500/10 text-primary-600 dark:text-primary-400 border-l-4 border-primary-500" 
         : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
@@ -24,18 +39,42 @@ const SidebarItem = ({ icon: Icon, label, to, active }: { icon: any, label: stri
   </Link>
 );
 
+/**
+ * Layout Component
+ * 
+ * アプリケーション全体の共通レイアウトを定義するコンポーネントです。
+ * - デスクトップ用サイドバー
+ * - モバイル用ボトムナビゲーション
+ * - モバイル用フルスクリーンメニュー
+ * - メインコンテンツエリア
+ * などを管理・表示します。
+ * 
+ * @component
+ */
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { user, signOut, isAdmin } = useAuth();
-  const { t } = useLanguage();
+  // フックの初期化
+  const location = useLocation(); // 現在のURL情報を取得
+  const navigate = useNavigate(); // ページ遷移用関数
+  const { user, signOut, isAdmin } = useAuth(); // 認証情報とログアウト関数
+  const { t } = useLanguage(); // 多言語対応用関数
+  
+  // モバイルメニューの開閉状態管理
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
+  /**
+   * ログアウト処理を行う関数
+   * 認証コンテキストの signOut を呼び出し、ログイン画面へリダイレクトします
+   */
   const handleLogout = async () => {
     await signOut();
     navigate('/login', { replace: true });
   };
 
+  /**
+   * ナビゲーション項目の設定配列
+   * アイコン、ラベル、遷移先パスを定義
+   * 管理者権限(isAdmin)によって表示項目を動的に変更しています
+   */
   const navItems = [
     { icon: LayoutDashboard, label: t('nav.dashboard'), path: '/dashboard' },
     { icon: Terminal, label: t('nav.missions'), path: '/missions' },
@@ -44,6 +83,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { icon: HelpCircle, label: t('nav.help'), path: '/help' },
     { icon: MessageCircle, label: t('nav.community'), path: '/community' },
     { icon: User, label: t('nav.profile'), path: '/profile' },
+    // 管理者のみ表示するメニュー項目
     ...(isAdmin ? [
       { icon: Shield, label: '管理者', path: '/admin' },
       { icon: Settings, label: '設定', path: '/settings' },
@@ -53,19 +93,22 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     ]),
   ];
 
-  // Close mobile menu when route changes
+  /**
+   * ページ遷移時にモバイルメニューを自動的に閉じる副作用
+   */
   React.useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-dark-bg text-slate-900 dark:text-slate-100 flex font-sans transition-colors duration-200">
-      {/* Mobile Menu Button */}
-
-
-      {/* Sidebar */}
-      {/* Sidebar (Desktop Only) */}
+      
+      {/* ==========================================
+          デスクトップ用サイドバー (Left Sidebar)
+          lgサイズ以上でのみ表示 (hidden lg:flex)
+          ========================================== */}
       <aside className="hidden lg:flex fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white dark:bg-dark-bg border-r border-slate-200 dark:border-dark-border flex-col shadow-sm dark:shadow-none">
+        {/* ロゴエリア */}
         <div className="p-6 flex items-center gap-3">
           <div className="w-8 h-8 bg-primary-500 rounded flex items-center justify-center text-white dark:text-dark-bg font-bold font-mono">
             &gt;_
@@ -73,6 +116,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">LinuxMastery</span>
         </div>
 
+        {/* ユーザープロファイル簡易表示エリア */}
         <div className="px-4 mb-6">
           <Link to="/profile" className="block bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700 flex items-center gap-3 shadow-sm dark:shadow-none hover:border-primary-500 transition-colors">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-blue-500 flex items-center justify-center text-white font-bold">
@@ -85,6 +129,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Link>
         </div>
 
+        {/* ナビゲーションメニューリスト */}
         <nav className="flex-1 px-2 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
             <SidebarItem
@@ -97,6 +142,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           ))}
         </nav>
 
+        {/* ログアウトボタンエリア */}
         <div className="p-4 border-t border-slate-200 dark:border-dark-border">
           <button 
             onClick={handleLogout}
@@ -108,9 +154,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </aside>
 
-      {/* Bottom Navigation (Mobile Only) */}
+      {/* ==========================================
+          モバイル用ボトムナビゲーション (Bottom Nav)
+          lgサイズ未満でのみ表示 (lg:hidden)
+          ========================================== */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe-area shadow-[0_-1px_3px_rgba(0,0,0,0.1)]">
         <div className="flex justify-around items-center px-2 py-2">
+          {/* ダッシュボード */}
           <Link 
             to="/dashboard" 
             className={clsx(
@@ -122,6 +172,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <span className="text-[10px] font-bold">{t('nav.dashboard')}</span>
           </Link>
           
+          {/* ミッション（ターミナル） */}
           <Link 
             to="/missions" 
             className={clsx(
@@ -133,6 +184,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <span className="text-[10px] font-bold">{t('nav.missions')}</span>
           </Link>
 
+          {/* ランキング */}
           <Link 
             to="/leaderboard" 
             className={clsx(
@@ -144,6 +196,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
              <span className="text-[10px] font-bold">{t('nav.ranking')}</span>
           </Link>
 
+          {/* メニュー開閉ボタン */}
           <button 
             onClick={() => setIsMobileMenuOpen(true)}
             className={clsx(
@@ -157,7 +210,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </nav>
 
-      {/* Mobile Full Menu Overlay */}
+      {/* ==========================================
+          モバイル用フルスクリーンメニューオーバーレイ
+          isMobileMenuOpenがtrueのときのみ表示
+          ========================================== */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[60] bg-white dark:bg-slate-900 overflow-y-auto animate-in slide-in-from-bottom duration-200">
           <div className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
@@ -167,6 +223,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
               <span className="font-bold text-lg dark:text-white">Menu</span>
             </div>
+            {/* 閉じるボタン */}
             <button 
               onClick={() => setIsMobileMenuOpen(false)}
               className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400"
@@ -176,6 +233,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           
           <div className="p-4 space-y-6">
+            {/* モバイルメニュー内プロファイルリンク */}
             <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-400 to-blue-500 flex items-center justify-center text-white font-bold text-lg">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
@@ -186,6 +244,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </Link>
 
+            {/* モバイルメニュー内ナビゲーションリスト */}
             <div className="space-y-1">
               {navItems.map((item) => (
                 <Link
@@ -199,6 +258,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </Link>
               ))}
               <div className="border-t border-slate-200 dark:border-slate-800 my-2"></div>
+              {/* モバイルメニュー内ログアウトボタン */}
               <button 
                 onClick={() => {
                   handleLogout();
@@ -214,33 +274,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       )}
 
-      {/* Main Content */}
+      {/* ==========================================
+          メインコンテンツエリア
+          ========================================== */}
       <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 dark:bg-dark-bg relative pb-20 lg:pb-0">
         {children}
       </main>
 
-      {/* Bottom Navigation for Mobile */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 z-50 px-6 py-2 flex justify-between items-center pb-safe-area shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-        <Link to="/dashboard" className={clsx("flex flex-col items-center gap-1 p-2", location.pathname === '/dashboard' ? "text-primary-600 dark:text-primary-400" : "text-slate-400")}>
-          <LayoutDashboard size={20} />
-          <span className="text-[10px] font-bold">{t('nav.dashboard')}</span>
-        </Link>
-        <Link to="/missions" className={clsx("flex flex-col items-center gap-1 p-2", location.pathname.startsWith('/missions') ? "text-primary-600 dark:text-primary-400" : "text-slate-400")}>
-          <div className="flex items-center justify-center w-5 h-5 font-mono font-bold text-base border-2 border-current rounded leading-none">&gt;_</div>
-          <span className="text-[10px] font-bold">{t('nav.missions')}</span>
-        </Link>
-        <Link to="/leaderboard" className={clsx("flex flex-col items-center gap-1 p-2", location.pathname === '/leaderboard' ? "text-primary-600 dark:text-primary-400" : "text-slate-400")}>
-          <Award size={20} />
-          <span className="text-[10px] font-bold">{t('nav.ranking')}</span>
-        </Link>
-        <button 
-          onClick={() => setIsMobileMenuOpen(true)}
-          className={clsx("flex flex-col items-center gap-1 p-2", isMobileMenuOpen ? "text-primary-600 dark:text-primary-400" : "text-slate-400")}
-        >
-          <Menu size={20} />
-          <span className="text-[10px] font-bold">{t('メニュー')}</span>
-        </button>
-      </div>
     </div>
   );
 };

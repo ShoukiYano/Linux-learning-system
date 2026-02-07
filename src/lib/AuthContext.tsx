@@ -3,55 +3,99 @@ import { User as AuthUser, Session } from '@supabase/supabase-js';
 import { auth, supabase, db } from './supabase';
 import { User } from '../types';
 
+/**
+ * AuthContextType
+ * 認証コンテキストが提供する値と関数の型定義
+ */
 interface AuthContextType {
+  /** アプリケーション独自のユーザー情報 (DBのusersテーブル) */
   user: User | null;
+  /** Supabase Authのユーザー情報 (認証サービス側) */
   authUser: AuthUser | null;
+  /** 現在のセッション情報 */
   session: Session | null;
+  /** 認証状態の確認中かどうか */
   loading: boolean;
+  /** 管理者権限を持っているかどうか */
   isAdmin: boolean;
+  /** サインアップ関数 */
   signUp: (email: string, password: string, name: string) => Promise<any>;
+  /** サインイン関数 */
   signIn: (email: string, password: string) => Promise<any>;
+  /** Googleログイン関数 */
   signInWithGoogle: () => Promise<any>;
+  /** ログアウト関数 */
   signOut: () => Promise<any>;
 }
 
+// コンテキストの作成
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * AuthProvider Component
+ * 
+ * アプリケーション全体に認証状態を提供するプロバイダーコンポーネントです。
+ * Supabaseの認証状態を監視し、ログインユーザーの情報を管理します。
+ */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  // ==========================================
+  // 状態管理 (State Management)
+  // ==========================================
+  const [user, setUser] = useState<User | null>(null);         // DB上のユーザープロファイル
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null); // Supabase Authユーザー
+  const [session, setSession] = useState<Session | null>(null);    // セッション情報
+  const [loading, setLoading] = useState(true);                    // ロード状態
 
+  // ==========================================
+  // 副作用 (Side Effects)
+  // ==========================================
+
+  /**
+   * 初回マウント時に実行
+   * 1. 現在のセッションを取得
+   * 2. 認証状態の変更リスナーを設定
+   */
   useEffect(() => {
     // Check if user is already logged in
     auth.getSession().then(({ data }) => {
       setSession(data.session);
       if (data.session?.user) {
         setAuthUser(data.session.user);
-        // Fetch user profile from database
+        // DBからユーザープロファイルを取得
         fetchUserProfile(data.session.user.id);
       }
       setLoading(false);
     });
 
-    // Listen for auth changes
+    // Listen for auth changes (ログイン、ログアウト、トークン更新など)
     const unsubscribe = auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session?.user) {
         setAuthUser(session.user);
         fetchUserProfile(session.user.id);
       } else {
+        // ログアウト時
         setAuthUser(null);
         setUser(null);
       }
     });
 
+    // クリーンアップ関数
     return () => {
       unsubscribe?.subscription?.unsubscribe();
     };
   }, []);
 
+  // ==========================================
+  // ヘルパー関数 (Helper Functions)
+  // ==========================================
+
+  /**
+   * DB(public.users)からユーザープロファイルを取得・同期する関数
+   * プロファイルが存在しない場合は作成を試みます（自己修復機能）
+   * 
+   * @param userId 取得するユーザーのID
+   */
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -89,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else if (data) {
         setUser(data);
-        // 背景でストリークを更新し、最新状態を取得して再セット
+        // 背景でストリーク（連続ログイン日数）を更新し、最新状態を取得して再セット
         db.updateStreak(userId).then((result: any) => {
           if (result.data) setUser(result.data);
         });
@@ -99,6 +143,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  /**
+   * 新規登録処理
+   * Supabase Authでの登録と同時に、DBへのユーザープロファイル作成を行います
+   */
   const handleSignUp = async (email: string, password: string, name: string) => {
     const result = await auth.signUp(email, password, name);
     if (result.error) {
@@ -125,14 +173,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return result;
   };
 
+  /**
+   * メールアドレスとパスワードによるログイン
+   */
   const handleSignIn = async (email: string, password: string) => {
     return auth.signIn(email, password);
   };
 
+  /**
+   * Googleアカウントによるログイン
+   */
   const handleSignInWithGoogle = async () => {
     return auth.signInWithGoogle();
   };
 
+  /**
+   * ログアウト
+   */
   const handleSignOut = async () => {
     return auth.signOut();
   };
@@ -144,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authUser,
         session,
         loading,
-        isAdmin: user?.role === 'admin',
+        isAdmin: user?.role === 'admin', // 管理者フラグの導出
         signUp: handleSignUp,
         signIn: handleSignIn,
         signInWithGoogle: handleSignInWithGoogle,
@@ -156,6 +213,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
+/**
+ * useAuth Hook
+ * 認証コンテキストを利用するためのカスタムフック
+ * AuthProviderの配下でのみ使用可能です
+ */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

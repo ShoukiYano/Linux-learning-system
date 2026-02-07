@@ -2,13 +2,23 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase Configuration
+// 環境変数からSupabaseのURLと匿名キーを取得
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://your-project.supabase.co';
 const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'your-anon-key';
 
+// Supabaseクライアントの初期化
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Auth functions
+// ==========================================
+// 認証関連関数 (Auth functions)
+// ==========================================
 export const auth = {
+  /**
+   * 新規ユーザー登録
+   * @param email メールアドレス
+   * @param password パスワード
+   * @param name ユーザー名（メタデータとして保存）
+   */
   async signUp(email: string, password: string, name: string) {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -22,6 +32,9 @@ export const auth = {
     return { data, error };
   },
 
+  /**
+   * メールアドレスとパスワードでログイン
+   */
   async signIn(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -30,6 +43,10 @@ export const auth = {
     return { data, error };
   },
 
+  /**
+   * Google OAuthログイン
+   * 認証後のリダイレクト先を指定してOAuthフローを開始
+   */
   async signInWithGoogle() {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -40,25 +57,43 @@ export const auth = {
     return { data, error };
   },
 
+  /**
+   * ログアウト
+   */
   async signOut() {
     const { error } = await supabase.auth.signOut();
     return { error };
   },
 
+  /**
+   * 現在のセッション情報を取得
+   */
   async getSession() {
     const { data, error } = await supabase.auth.getSession();
     return { data, error };
   },
 
+  /**
+   * 認証状態の変更を監視するリスナー設定
+   * @param callback 状態変更時に呼ばれる関数
+   */
   onAuthStateChange(callback: (event: string, session: any) => void) {
     const { data } = supabase.auth.onAuthStateChange(callback);
     return data;
   },
 };
 
-// Database operations
+// ==========================================
+// データベース操作 (Database operations)
+// ==========================================
 export const db = {
-  // Users
+  // ------------------------------------------
+  // ユーザー (Users)
+  // ------------------------------------------
+
+  /**
+   * ユーザーIDからプロフィール情報を取得
+   */
   async getUser(userId: string) {
     const { data, error } = await supabase
       .from('users')
@@ -68,6 +103,11 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ユーザー情報の更新
+   * @param userId 対象ユーザーID
+   * @param updates 更新データオブジェクト
+   */
   async updateUser(userId: string, updates: any) {
     const { data, error } = await supabase
       .from('users')
@@ -78,6 +118,10 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ストリーク（連続ログイン日数）の更新ロジック
+   * 最終アクティブ日時と比較してストリークを加算またはリセットします
+   */
   async updateStreak(userId: string) {
     const { data: user, error: fetchError } = await this.getUser(userId);
     if (fetchError || !user) return { error: fetchError };
@@ -85,11 +129,11 @@ export const db = {
     const now = new Date();
     const lastActive = user.last_active_at ? new Date(user.last_active_at) : null;
     
-    // Normalize dates to UTC midnight for day-based comparison
+    // 日付比較のためにUTC深夜0時に正規化
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     
     if (!lastActive) {
-      // First time activity
+      // 初回のアクティビティ
       return await this.updateUser(userId, { 
         streak: 1, 
         last_active_at: now.toISOString() 
@@ -102,19 +146,19 @@ export const db = {
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays === 1) {
-      // Consecutive day!
+      // 連続した日付：ストリーク加算
       return await this.updateUser(userId, { 
         streak: (user.streak || 0) + 1, 
         last_active_at: now.toISOString() 
       });
     } else if (diffDays > 1) {
-      // Gap found, reset
+      // 1日以上空いた：ストリークリセット
       return await this.updateUser(userId, { 
         streak: 1, 
         last_active_at: now.toISOString() 
       });
     } else if (diffDays === 0) {
-      // Already updated today, just update last_active_at for precision
+      // 同日中の活動：最終アクティブ時刻のみ更新
       return await this.updateUser(userId, { 
         last_active_at: now.toISOString() 
       });
@@ -123,6 +167,9 @@ export const db = {
     return { data: user, error: null };
   },
 
+  /**
+   * 全ユーザーリストの取得（作成日順）
+   */
   async getUsers() {
     const { data, error } = await supabase
       .from('users')
@@ -131,21 +178,24 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ユーザーの完全削除
+   * 関連する全てのデータ（活動履歴、投稿、投票など）をカスケード削除します
+   */
   async deleteUser(userId: string) {
-    // Clear related data first to avoid foreign key constraint errors
     try {
       console.log(`Starting comprehensive delete for user: ${userId}`);
       
-      // 1. Delete simple activity/progress
+      // 1. 活動履歴と進行状況の削除
       await supabase.from('activities').delete().eq('user_id', userId);
       await supabase.from('user_missions').delete().eq('user_id', userId);
       
-      // 2. Clear personal votes
+      // 2. 個人の投票データの削除
       await supabase.from('qa_post_votes').delete().eq('user_id', userId);
       await supabase.from('qa_answer_votes').delete().eq('user_id', userId);
       await supabase.from('help_article_votes').delete().eq('user_id', userId);
       
-      // 3. Handle user's answers (delete votes on them first)
+      // 3. ユーザーの回答の削除（関連する投票も先に削除）
       const { data: userAnswers } = await supabase.from('qa_answers').select('id').eq('user_id', userId);
       if (userAnswers && userAnswers.length > 0) {
         const answerIds = userAnswers.map(a => a.id);
@@ -154,12 +204,12 @@ export const db = {
         console.log(`Deleted ${userAnswers.length} user answers and their votes`);
       }
       
-      // 4. Handle user's posts (delete related answers and votes)
+      // 4. ユーザーの投稿の削除（関連する回答と投票も削除）
       const { data: userPosts } = await supabase.from('qa_posts').select('id').eq('user_id', userId);
       if (userPosts && userPosts.length > 0) {
         const postIds = userPosts.map(p => p.id);
         
-        // Find all answers to these posts to delete their votes first
+        // 投稿に対する回答とその投票を削除
         const { data: relatedAnswers } = await supabase.from('qa_answers').select('id').in('post_id', postIds);
         if (relatedAnswers && relatedAnswers.length > 0) {
           const relAnswerIds = relatedAnswers.map(a => a.id);
@@ -172,9 +222,7 @@ export const db = {
         console.log(`Deleted ${userPosts.length} user posts and their related content`);
       }
 
-      // 5. Explicitly handle references in content tables
-      // Set created_by to NULL if possible, or handle accordingly
-      // We wrap these in try-catch as these columns might not always exist or be nullable
+      // 5. コンテンツテーブルの参照をNULLに設定（作成者情報の削除）
       try {
         await supabase.from('learning_paths').update({ created_by: null } as any).eq('created_by', userId);
         await supabase.from('help_articles').update({ created_by: null } as any).eq('created_by', userId);
@@ -182,7 +230,7 @@ export const db = {
         console.warn('Could not nullify created_by references, possibly non-nullable or missing column', e);
       }
 
-      // 6. Finally delete the user profile from public.users
+      // 6. 最後にpublic.usersテーブルからユーザーを削除
       const { error } = await supabase
         .from('users')
         .delete()
@@ -201,7 +249,13 @@ export const db = {
     }
   },
 
-  // Missions
+  // ------------------------------------------
+  // ミッション (Missions)
+  // ------------------------------------------
+
+  /**
+   * 全ミッションデータを取得（表示順・作成日順）
+   */
   async getMissions() {
     const { data, error } = await supabase
       .from('missions')
@@ -211,6 +265,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * 特定のミッションを取得
+   */
   async getMission(missionId: string) {
     const { data, error } = await supabase
       .from('missions')
@@ -220,7 +277,13 @@ export const db = {
     return { data, error };
   },
 
-  // Mission Steps
+  // ------------------------------------------
+  // ミッションステップ (Mission Steps)
+  // ------------------------------------------
+
+  /**
+   * ミッションに紐づくステップ一覧を取得
+   */
   async getMissionSteps(missionId: string) {
     const { data, error } = await supabase
       .from('mission_steps')
@@ -230,6 +293,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ミッションステップの一括保存（既存ステップを削除して再挿入）
+   */
   async saveMissionSteps(missionId: string, steps: any[]) {
     // 既存のステップを削除
     await supabase
@@ -258,6 +324,9 @@ export const db = {
     return { data: [], error: null };
   },
 
+  /**
+   * ミッション詳細とステップ一覧を同時に取得する複合関数
+   */
   async getMissionWithSteps(missionId: string) {
     const { data: mission, error: missionError } = await supabase
       .from('missions')
@@ -284,6 +353,9 @@ export const db = {
     };
   },
 
+  /**
+   * ユーザーごとのミッション進捗を取得
+   */
   async getUserMissions(userId: string) {
     const { data, error } = await supabase
       .from('user_missions')
@@ -292,6 +364,12 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ミッション完了処理
+   * 1. user_missionsテーブルに完了記録を追加・更新
+   * 2. ユーザーのXPとレベルを加算・更新
+   * @param xp 獲得経験値
+   */
   async completeMission(userId: string, missionId: string, xp: number) {
     const { data, error } = await supabase
       .from('user_missions')
@@ -309,6 +387,7 @@ export const db = {
       const user = await this.getUser(userId);
       if (user.data) {
         const newXp = (user.data.xp || 0) + xp;
+        // 例: 500XPごとにレベルアップ
         const newLevel = Math.floor(newXp / 500) + 1;
         await this.updateUser(userId, { xp: newXp, level: newLevel });
       }
@@ -317,7 +396,13 @@ export const db = {
     return { data, error };
   },
 
-  // Leaderboard
+  // ------------------------------------------
+  // リーダーボード (Leaderboard)
+  // ------------------------------------------
+
+  /**
+   * 経験値(XP)順のリーダーボードを取得
+   */
   async getLeaderboard(limit: number = 50) {
     const { data, error } = await supabase
       .from('users')
@@ -327,6 +412,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ストリーク順のリーダーボードを取得
+   */
   async getLeaderboardByStreak(limit: number = 50) {
     const { data, error } = await supabase
       .from('users')
@@ -336,7 +424,13 @@ export const db = {
     return { data, error };
   },
 
-  // Activity
+  // ------------------------------------------
+  // アクティビティログ (Activity Log)
+  // ------------------------------------------
+
+  /**
+   * ユーザーの活動を記録
+   */
   async logActivity(userId: string, activity: {
     type: string;
     missionId?: string;
@@ -358,6 +452,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ユーザーの最近の活動を取得
+   */
   async getUserActivity(userId: string, limit: number = 20) {
     const { data, error } = await supabase
       .from('activities')
@@ -368,6 +465,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * 過去7日間の活動データを取得（グラフ表示用など）
+   */
   async getWeeklyActivity(userId: string) {
     const lastWeek = new Date();
     lastWeek.setDate(lastWeek.getDate() - 7);
@@ -382,7 +482,13 @@ export const db = {
     return { data, error };
   },
 
-  // Commands (辞典)
+  // ------------------------------------------
+  // コマンド辞典 (Commands Dictionary)
+  // ------------------------------------------
+
+  /**
+   * 全コマンド一覧を取得
+   */
   async getCommands() {
     const { data, error } = await supabase
       .from('commands')
@@ -391,6 +497,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * コマンドの新規作成
+   */
   async createCommand(command: any) {
     const { data, error } = await supabase
       .from('commands')
@@ -400,6 +509,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * コマンド情報の更新
+   */
   async updateCommand(id: string, updates: any) {
     const { data, error } = await supabase
       .from('commands')
@@ -410,6 +522,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * コマンドの削除
+   */
   async deleteCommand(id: string) {
     const { error } = await supabase
       .from('commands')
@@ -418,7 +533,13 @@ export const db = {
     return { error };
   },
 
-  // Learning Paths (学習パス)
+  // ------------------------------------------
+  // 学習パス (Learning Paths)
+  // ------------------------------------------
+
+  /**
+   * 学習パス一覧と、それに含まれるミッションを取得
+   */
   async getLearningPaths() {
     const { data, error } = await supabase
       .from('learning_paths')
@@ -442,6 +563,10 @@ export const db = {
 
     return { data: formattedData, error };
   },
+
+  /**
+   * 学習パスの作成
+   */
   async createLearningPath(path: any) {
     const rawLevel = path.level || path.difficulty || 'Intermediate';
     const capitalizedLevel = rawLevel.charAt(0).toUpperCase() + rawLevel.slice(1).toLowerCase();
@@ -476,6 +601,9 @@ export const db = {
     return { data: pathData, error: null };
   },
 
+  /**
+   * 学習パスの更新（ミッションの関連付け替え含む）
+   */
   async updateLearningPath(id: string, updates: any) {
     const rawLevel = updates.level || updates.difficulty;
     const capitalizedLevel = rawLevel ? rawLevel.charAt(0).toUpperCase() + rawLevel.slice(1).toLowerCase() : undefined;
@@ -514,6 +642,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * 学習パスの削除
+   */
   async deleteLearningPath(id: string) {
     const { error } = await supabase
       .from('learning_paths')
@@ -522,6 +653,9 @@ export const db = {
     return { error };
   },
 
+  /**
+   * 学習パスの詳細取得
+   */
   async getLearningPath(id: string) {
     const { data, error } = await supabase
       .from('learning_paths')
@@ -549,7 +683,13 @@ export const db = {
     return { data: formattedData, error: null };
   },
 
-  // Help Articles (ヘルプセンター)
+  // ------------------------------------------
+  // ヘルプ記事 (Help Articles)
+  // ------------------------------------------
+
+  /**
+   * ヘルプ記事一覧を取得
+   */
   async getHelpArticles() {
     const { data, error } = await supabase
       .from('help_articles')
@@ -558,6 +698,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ヘルプ記事の作成
+   */
   async createHelpArticle(article: any) {
     const { data, error } = await supabase
       .from('help_articles')
@@ -573,6 +716,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ヘルプ記事の更新
+   */
   async updateHelpArticle(id: string, updates: any) {
     const { data, error } = await supabase
       .from('help_articles')
@@ -583,6 +729,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * IDによるヘルプ記事取得
+   */
   async getHelpArticleById(id: string) {
     const { data, error } = await supabase
       .from('help_articles')
@@ -592,6 +741,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * ユーザーの投票済み記事一覧を取得
+   */
   async getHelpArticleVotes(userId: string) {
     const { data, error } = await supabase
       .from('help_article_votes')
@@ -600,6 +752,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * 記事への「役に立った」投票のトグル処理
+   */
   async toggleHelpfulVote(articleId: string, userId: string) {
     // Check if vote already exists
     const { data: existingVote } = await supabase
@@ -645,7 +800,13 @@ export const db = {
     return { data, error, voted: !existingVote };
   },
 
-  // Q&A
+  // ------------------------------------------
+  // Q&A掲示板 (Community Q&A)
+  // ------------------------------------------
+
+  /**
+   * 投稿一覧を取得（関連するユーザー、投票、回答を含む）
+   */
   async getQAPosts() {
     const { data, error } = await supabase
       .from('qa_posts')
@@ -665,6 +826,7 @@ export const db = {
       `)
       .order('created_at', { ascending: false });
     
+    // データ整形：配列やオブジェクトの入れ子構造をフラットにして扱いやすくする
     const formattedData = data?.map(post => {
       // Handle the case where 'users' might be an array or an object
       const postUser = Array.isArray(post.users) ? post.users[0] : post.users;
@@ -691,6 +853,9 @@ export const db = {
     return { data: formattedData, error };
   },
 
+  /**
+   * 投稿への投票トグル
+   */
   async toggleQAPostVote(postId: string, userId: string) {
     // Check if vote exists
     const { data: existingVote, error: checkError } = await supabase
@@ -719,6 +884,9 @@ export const db = {
     }
   },
 
+  /**
+   * 回答への投票トグル
+   */
   async toggleQAAnswerVote(answerId: string, userId: string) {
     const { data: existingVote, error: checkError } = await supabase
       .from('qa_answer_votes')
@@ -744,6 +912,9 @@ export const db = {
     }
   },
 
+  /**
+   * 投稿の削除
+   */
   async deleteQAPost(postId: string) {
     const { error } = await supabase
       .from('qa_posts')
@@ -752,6 +923,9 @@ export const db = {
     return { error };
   },
 
+  /**
+   * 回答の削除
+   */
   async deleteQAAnswer(answerId: string) {
     const { error } = await supabase
       .from('qa_answers')
@@ -760,6 +934,9 @@ export const db = {
     return { error };
   },
 
+  /**
+   * 投稿の作成
+   */
   async createQAPost(post: any) {
     const { data, error } = await supabase
       .from('qa_posts')
@@ -774,6 +951,9 @@ export const db = {
     return { data, error };
   },
 
+  /**
+   * 回答の作成
+   */
   async createQAAnswer(answer: any) {
     const { data, error } = await supabase
       .from('qa_answers')
@@ -787,9 +967,15 @@ export const db = {
     return { data, error };
   },
 
-  // Admin Stats
+  // ------------------------------------------
+  // 管理画面用統計データ (Admin Stats)
+  // ------------------------------------------
+
+  /**
+   * 管理ダッシュボード向けの統計情報を集計して返す
+   */
   async getAdminStats() {
-    // Basic counts
+    // 各テーブルの総数取得
     const { count: userCount } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true });
@@ -798,12 +984,12 @@ export const db = {
       .from('missions')
       .select('*', { count: 'exact', head: true });
 
-    // Activities today (unique users who ran commands) - JST Boundary
+    // 本日のアクティビティ（JST境界を考慮）
     const now = new Date();
     const jstOffset = 9 * 60 * 60 * 1000; // JST is UTC+9
     const todayJST = new Date(now.getTime() + jstOffset);
     todayJST.setUTCHours(0, 0, 0, 0);
-    // Convert back to UTC for the query since DB stores in UTC
+    // DBはUTCなので、クエリ用にUTCに戻す
     const todayStartUTC = new Date(todayJST.getTime() - jstOffset).toISOString();
 
     const { data: todayActivities } = await supabase
@@ -812,21 +998,20 @@ export const db = {
       .gte('created_at', todayStartUTC)
       .eq('type', 'command_execution');
     
+    // ユニークユーザー数
     const activeToday = new Set(todayActivities?.map(a => a.user_id)).size;
 
-    // New signups today
+    // 本日の新規登録者数
     const { count: newSignupsToday } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', todayStartUTC);
 
-    // Users not active for more than 7 days
+    // 7日以上活動がないユーザー（簡易的な算出）
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
-    // This is a bit complex in Supabase without a join or last_active field. 
-    // For now, let's use the created_at of users or assume a simple metric.
-    // Ideally we'd select users WHERE NOT EXISTS (activity in last 7 days)
+    // 最近7日間に活動があったユーザーIDを取得
     const { data: recentActiveUsers } = await supabase
       .from('activities')
       .select('user_id')
@@ -835,13 +1020,14 @@ export const db = {
     const activeIds = new Set(recentActiveUsers?.map(a => a.user_id));
     const inactiveCount = (userCount || 0) - activeIds.size;
 
+    // トップユーザー5名
     const { data: topUsers } = await supabase
       .from('users')
       .select('id, name, xp, level')
       .order('xp', { ascending: false })
       .limit(5);
 
-    // Weekly activity for all users
+    // 全ユーザーの週間活動データ（グラフ用）
     const lastWeek = new Date();
     lastWeek.setDate(lastWeek.getDate() - 7);
     const { data: weeklyData } = await supabase
@@ -850,14 +1036,14 @@ export const db = {
       .gte('created_at', lastWeek.toISOString())
       .eq('type', 'command_execution');
 
-    // Recent activities for the table
+    // 直近のアクティビティ（テーブル表示用）
     const { data: recentActivities } = await supabase
       .from('activities')
       .select('*, users(name)')
       .order('created_at', { ascending: false })
       .limit(10);
 
-    // Recent signups for the table
+    // 直近の新規登録ユーザー
     const { data: recentUsers } = await supabase
       .from('users')
       .select('*')
@@ -877,6 +1063,6 @@ export const db = {
     };
   },
 
-  // Admin methods
+  // 互換性やデバッグ用にSupabaseクライアント自体も公開
   supabase,
 };
