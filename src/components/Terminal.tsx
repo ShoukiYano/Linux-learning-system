@@ -32,18 +32,8 @@ export const Terminal: React.FC<TerminalProps> = ({
   const [oldPwd, setOldPwd] = useState<string | undefined>(undefined);
   const [input, setInput] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-      inputRef.current.style.height = inputRef.current.scrollHeight + 'px';
-      // keep view at bottom when typing causes resize
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [input]);
 
   // Notify parent when fs or cwd changes
   useEffect(() => {
@@ -227,19 +217,53 @@ export const Terminal: React.FC<TerminalProps> = ({
         if (onCommand) onCommand(cmdTrimmed, output, result);
       }
       setInput('');
+      setCursorPos(0); // Reset cursor position
     }
   };
 
-  // ... (Virtual Keyboard Handler Wrappers) ...
+  // Track cursor position for custom rendering
+  const [cursorPos, setCursorPos] = useState(0);
 
+  // Sync cursor position when input changes or on selection change
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+    setCursorPos(e.target.selectionStart || 0);
+  };
+
+  const handleInputSelect = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    setCursorPos(e.currentTarget.selectionStart || 0);
+  };
+
+  // Virtual Keyboard Handlers
   const handleVirtualKey = (key: string) => {
-    setInput(prev => prev + key);
-    inputRef.current?.focus();
+    const newVal = input.slice(0, cursorPos) + key + input.slice(cursorPos);
+    setInput(newVal);
+    const newPos = cursorPos + 1;
+    setCursorPos(newPos);
+    
+    // Sync hidden input
+    if (inputRef.current) {
+      inputRef.current.value = newVal;
+      inputRef.current.setSelectionRange(newPos, newPos);
+      inputRef.current.focus();
+    }
   };
 
   const handleVirtualBS = () => {
-    setInput(prev => prev.slice(0, -1));
-    inputRef.current?.focus();
+    if (cursorPos === 0) {
+        inputRef.current?.focus();
+        return;
+    }
+    const newVal = input.slice(0, cursorPos - 1) + input.slice(cursorPos);
+    setInput(newVal);
+    const newPos = cursorPos - 1;
+    setCursorPos(newPos);
+    
+    if (inputRef.current) {
+        inputRef.current.value = newVal;
+        inputRef.current.setSelectionRange(newPos, newPos);
+        inputRef.current.focus();
+    }
   };
 
   const handleVirtualEnter = () => {
@@ -253,20 +277,22 @@ export const Terminal: React.FC<TerminalProps> = ({
   };
 
   const handleVirtualLeft = () => {
-    if (inputRef.current) {
-      const pos = inputRef.current.selectionStart || 0;
-      if (pos > 0) {
-        inputRef.current.setSelectionRange(pos - 1, pos - 1);
+    if (cursorPos > 0) {
+      const newPos = cursorPos - 1;
+      setCursorPos(newPos);
+      if (inputRef.current) {
+        inputRef.current.setSelectionRange(newPos, newPos);
         inputRef.current.focus();
       }
     }
   };
 
   const handleVirtualRight = () => {
-    if (inputRef.current) {
-      const pos = inputRef.current.selectionStart || 0;
-      if (pos < input.length) {
-        inputRef.current.setSelectionRange(pos + 1, pos + 1);
+    if (cursorPos < input.length) {
+      const newPos = cursorPos + 1;
+      setCursorPos(newPos);
+      if (inputRef.current) {
+        inputRef.current.setSelectionRange(newPos, newPos);
         inputRef.current.focus();
       }
     }
@@ -306,13 +332,13 @@ export const Terminal: React.FC<TerminalProps> = ({
         {history.map((entry, i) => (
             <div key={i} className="mb-2">
             {entry.command !== undefined && (
-                <div className="flex gap-2 flex-nowrap">
-                <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0">student@l-quest:{entry.cwd}$</span>
+                <div className="break-all whitespace-pre-wrap"> {/* Changed from flex to block layout */}
+                <span className="text-primary-600 dark:text-primary-500 font-bold mr-2">student@l-quest:{entry.cwd}$</span>
                 <span className="text-slate-800 dark:text-slate-100">{entry.command}</span>
                 </div>
             )}
             {entry.output && (
-                <div className={clsx("whitespace-pre-wrap mt-1", entry.status === 'error' ? "text-red-500 dark:text-red-400" : "text-slate-600 dark:text-slate-300")}>
+                <div className={clsx("whitespace-pre-wrap break-all mt-1", entry.status === 'error' ? "text-red-500 dark:text-red-400" : "text-slate-600 dark:text-slate-300")}>
                 {entry.output}
                 </div>
             )}
@@ -322,23 +348,32 @@ export const Terminal: React.FC<TerminalProps> = ({
             </div>
         ))}
 
-        <div className="flex gap-2 items-start flex-nowrap mb-4">
-            <span className="text-primary-600 dark:text-primary-500 font-bold whitespace-nowrap shrink-0 pt-[2px]">student@l-quest:{cwd}$</span>
-            <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isExecuting}
-            inputMode={isMobile ? 'none' : 'text'}
-            rows={1}
-            className={clsx(
-                "bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 flex-1 caret-primary-500 resize-none overflow-hidden",
-                isExecuting && "opacity-50 cursor-not-allowed"
-            )}
-            autoFocus
-            autoComplete="off"
-            spellCheck="false"
+        {/* Current Active Line with Custom Rendering */}
+        <div className="relative mb-4 break-all whitespace-pre-wrap">
+            <span className="text-primary-600 dark:text-primary-500 font-bold mr-2">student@l-quest:{cwd}$</span>
+            
+            {/* Render input with cursor */}
+            <span className="text-slate-800 dark:text-slate-100">
+                {input.slice(0, cursorPos)}
+                <span className="bg-slate-500/50 dark:bg-slate-400/50 animate-pulse text-slate-900 dark:text-slate-50 inline-block min-w-[0.5em] align-middle">
+                    {input[cursorPos] || '\u00A0'}
+                </span>
+                {input.slice(cursorPos + 1)}
+            </span>
+
+            {/* Hidden Input for capturing typing/focus */}
+            <input
+                ref={inputRef} // Cast removed as inputRef type is now HTMLInputElement
+                type="text"
+                value={input}
+                onChange={handleInputChange}
+                onSelect={handleInputSelect}
+                onKeyDown={handleKeyDown}
+                disabled={isExecuting}
+                inputMode={isMobile ? 'none' : 'text'}
+                className="absolute opacity-0 inset-0 w-full h-full cursor-default"
+                autoFocus
+                autoComplete="off"
             />
         </div>
         <div ref={bottomRef} />
